@@ -1,56 +1,12 @@
-// Package gcf is the Google Cloud Functions entry point for GraDiOl API.
+//go:build ignore
+// +build ignore
+
+// Package gcf previously hosted the Google Cloud Functions (Gen 2) entry point
+// for the GraDiOl API. Deployment has moved to Render via ./cmd/api (see
+// render.yaml), so this file is now excluded from all builds via the "ignore"
+// build tag and carries no compileable code (and no functions-framework import).
 //
-// Google Cloud Functions 2nd gen requires:
-//   - functions.HTTP() registration in init()
-//   - net/http compatible handler
-//
-// Since Fiber uses fasthttp (not net/http), we use gofiber/adaptor
-// to bridge the Fiber app into a standard http.Handler.
-//
-// Deploy with:
-//
-//	gcloud functions deploy gradiol-api \
-//	  --gen2 \
-//	  --region=asia-southeast1 \
-//	  --runtime=go122 \
-//	  --trigger-http \
-//	  --allow-unauthenticated \
-//	  --entry-point=GraDiOlAPI \
-//	  --source=. \
-//	  --set-env-vars="ENV=production,SUPABASE_DATABASE_URL=...,JWT_SECRET=...,GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,GITHUB_CLIENT_ID=...,GITHUB_CLIENT_SECRET=...,FRONTEND_URL=..."
+// To restore GCF support, remove the build tags above, re-add the original
+// handleRequest/once/app.New() body, and reinstall the
+// `github.com/GoogleCloudPlatform/functions-framework-go` dependency.
 package gcf
-
-import (
-	"log"
-	"net/http"
-	"sync"
-
-	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-
-	"github.com/RenzIP/Graphic-Diagram-Online/app"
-)
-
-var (
-	instance *app.Instance
-	once     sync.Once
-)
-
-func init() {
-	functions.HTTP("GraDiOlAPI", handleRequest)
-}
-
-// handleRequest is the Cloud Function entry point.
-// It lazily initializes the Fiber app on the first request (cold start),
-// then proxies all subsequent requests through Fiber via the adaptor.
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-	once.Do(func() {
-		log.Println("☁️  GraDiOl Cloud Function cold start — initializing app...")
-		instance = app.New()
-		log.Println("✓ GraDiOl Cloud Function ready")
-	})
-
-	// Bridge net/http → Fiber (fasthttp) using the adaptor
-	handler := adaptor.FiberApp(instance.App)
-	handler(w, r)
-}
