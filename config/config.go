@@ -53,7 +53,7 @@ type Config struct {
 // Load reads environment variables and returns a validated Config.
 // Panics if required variables are missing in production.
 func Load() *Config {
-	_ = godotenv.Load()
+	loadDotEnv()
 
 	cfg := &Config{
 		Port:               getEnv("PORT", "8080"),
@@ -108,4 +108,13 @@ func getEnvInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func loadDotEnv() {
+	for _, path := range []string{".env", "../.env", "../../.env"} {
+		if _, err := os.Stat(path); err == nil {
+			_ = godotenv.Load(path)
+			return
+		}
+	}
 }
