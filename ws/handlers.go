@@ -1,8 +1,10 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	gws "github.com/gofiber/websocket/v2"
@@ -37,8 +39,37 @@ func HandleWebSocket(hub *Hub) fiber.Handler {
 
 		log.Printf("[WS] Client %s joined room %s", clientID, documentID)
 
+		// --- Redis: register presence ---
+		ctx := context.Background()
+		if hub.Presence != nil {
+			if err := hub.Presence.SetPresence(ctx, documentID, clientID, client.Name); err != nil {
+				log.Printf("[WS] Redis presence set error: %v", err)
+			}
+			if err := hub.Presence.SetHeartbeat(ctx, documentID, clientID); err != nil {
+				log.Printf("[WS] Redis heartbeat set error: %v", err)
+			}
+		}
+
+		// --- Heartbeat goroutine: keep Redis presence alive ---
+		heartbeatDone := make(chan struct{})
+		if hub.Presence != nil {
+			go func() {
+				ticker := time.NewTicker(15 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-heartbeatDone:
+						return
+					case <-ticker.C:
+						hbCtx := context.Background()
+						_ = hub.Presence.SetHeartbeat(hbCtx, documentID, clientID)
+					}
+				}
+			}()
+		}
+
 		// Send room state to the new client
-		sendRoomState(client, room)
+		sendRoomState(client, room, hub)
 
 		// Notify others
 		broadcastJSON(room, clientID, Message{
@@ -51,8 +82,30 @@ func HandleWebSocket(hub *Hub) fiber.Handler {
 
 		// Read loop
 		defer func() {
+			// Stop heartbeat
+			close(heartbeatDone)
+
 			room.RemoveClient(clientID)
 			hub.RemoveRoomIfEmpty(documentID)
+
+			// --- Redis: clean up presence and locks ---
+			cleanCtx := context.Background()
+			if hub.Presence != nil {
+				if err := hub.Presence.RemovePresence(cleanCtx, documentID, clientID); err != nil {
+					log.Printf("[WS] Redis presence remove error: %v", err)
+				}
+			}
+			if hub.Locks != nil {
+				// Release all Redis locks held by this client
+				locks, err := hub.Locks.GetRoomLocks(cleanCtx, documentID)
+				if err == nil {
+					for nodeID, lockerID := range locks {
+						if lockerID == clientID {
+							_ = hub.Locks.UnlockNode(cleanCtx, documentID, nodeID, clientID)
+						}
+					}
+				}
+			}
 
 			broadcastJSON(room, "", Message{
 				Type:   TypeUserLeft,
@@ -74,26 +127,46 @@ func HandleWebSocket(hub *Hub) fiber.Handler {
 				continue
 			}
 
-			handleMessage(client, room, msg)
+			handleMessage(client, room, hub, msg)
 		}
 	})
 }
 
-func handleMessage(client *Client, room *Room, msg Message) {
+func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
+	ctx := context.Background()
+
 	switch msg.Type {
 	case TypeLockNode:
-		if room.LockNode(msg.NodeID, client.ID) {
-			broadcastJSON(room, "", Message{
-				Type:   TypeNodeLocked,
-				NodeID: msg.NodeID,
-				By:     client.ID,
-			})
-		} else {
+		// In-memory lock
+		if !room.LockNode(msg.NodeID, client.ID) {
 			sendError(client, "Node is already locked")
+			return
 		}
+		// Redis lock (best-effort write-through)
+		if hub.Locks != nil {
+			ok, err := hub.Locks.LockNode(ctx, client.Room, msg.NodeID, client.ID)
+			if err != nil {
+				log.Printf("[WS] Redis lock error: %v", err)
+			} else if !ok {
+				// Redis says someone else holds it — rollback in-memory
+				room.UnlockNode(msg.NodeID, client.ID)
+				sendError(client, "Node is already locked")
+				return
+			}
+		}
+		broadcastJSON(room, "", Message{
+			Type:   TypeNodeLocked,
+			NodeID: msg.NodeID,
+			By:     client.ID,
+		})
 
 	case TypeUnlockNode:
 		room.UnlockNode(msg.NodeID, client.ID)
+		if hub.Locks != nil {
+			if err := hub.Locks.UnlockNode(ctx, client.Room, msg.NodeID, client.ID); err != nil {
+				log.Printf("[WS] Redis unlock error: %v", err)
+			}
+		}
 		broadcastJSON(room, "", Message{
 			Type:   TypeNodeUnlocked,
 			NodeID: msg.NodeID,
@@ -114,6 +187,9 @@ func handleMessage(client *Client, room *Room, msg Message) {
 
 	case TypeDeleteNode:
 		room.UnlockNode(msg.NodeID, client.ID)
+		if hub.Locks != nil {
+			_ = hub.Locks.UnlockNode(ctx, client.Room, msg.NodeID, client.ID)
+		}
 		broadcastJSON(room, client.ID, Message{
 			Type:   TypeNodeDeleted,
 			NodeID: msg.NodeID,
@@ -144,7 +220,7 @@ func handleMessage(client *Client, room *Room, msg Message) {
 	}
 }
 
-func sendRoomState(client *Client, room *Room) {
+func sendRoomState(client *Client, room *Room, hub *Hub) {
 	room.mu.RLock()
 	defer room.mu.RUnlock()
 
@@ -158,10 +234,27 @@ func sendRoomState(client *Client, room *Room) {
 		}
 	}
 
+	// Merge in-memory locks with Redis locks for the most complete picture
+	locks := make(map[string]string, len(room.Locks))
+	for k, v := range room.Locks {
+		locks[k] = v
+	}
+	if hub.Locks != nil {
+		ctx := context.Background()
+		redisLocks, err := hub.Locks.GetRoomLocks(ctx, room.ID)
+		if err == nil {
+			for k, v := range redisLocks {
+				if _, exists := locks[k]; !exists {
+					locks[k] = v
+				}
+			}
+		}
+	}
+
 	msg := Message{
 		Type:  TypeRoomState,
 		Users: users,
-		Locks: room.Locks,
+		Locks: locks,
 	}
 
 	data, _ := json.Marshal(msg)
@@ -183,3 +276,4 @@ func sendError(client *Client, message string) {
 	})
 	_ = client.Send(data)
 }
+

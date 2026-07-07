@@ -81,3 +81,18 @@ type ExportDocumentReq struct {
 	Background string  `json:"background" validate:"omitempty"`
 	Padding    int     `json:"padding"    validate:"omitempty,min=0,max=200"`
 }
+
+// DocumentVersionResp represents a single historical version.
+type DocumentVersionResp struct {
+	ID        string          `json:"id"`
+	Version   int             `json:"version"`
+	Content   json.RawMessage `json:"content"`
+	View      json.RawMessage `json:"view"`
+	CreatedBy *string         `json:"created_by"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// DocumentVersionListResp is the response for GET /api/documents/:id/versions.
+type DocumentVersionListResp struct {
+	Data []DocumentVersionResp `json:"data"`
+}

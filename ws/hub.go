@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/fasthttp/websocket"
+
+	redissvc "github.com/RenzIP/Graphic-Diagram-Online/redis"
 )
 
 // Client represents a single WebSocket connection
@@ -90,15 +92,28 @@ func (r *Room) IsEmpty() bool {
 	return len(r.Clients) == 0
 }
 
-// Hub manages all rooms
+// Hub manages all rooms and optionally delegates durable state to Redis.
 type Hub struct {
-	rooms map[string]*Room
-	mu    sync.RWMutex
+	rooms    map[string]*Room
+	mu       sync.RWMutex
+	Locks    *redissvc.LockService     // nil when Redis is unavailable
+	Presence *redissvc.PresenceService // nil when Redis is unavailable
 }
 
+// NewHub creates a Hub without Redis backing (in-memory only).
 func NewHub() *Hub {
 	return &Hub{
 		rooms: make(map[string]*Room),
+	}
+}
+
+// NewHubWithRedis creates a Hub that delegates lock and presence
+// operations to Redis for durability across restarts/replicas.
+func NewHubWithRedis(locks *redissvc.LockService, presence *redissvc.PresenceService) *Hub {
+	return &Hub{
+		rooms:    make(map[string]*Room),
+		Locks:    locks,
+		Presence: presence,
 	}
 }
 

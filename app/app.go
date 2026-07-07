@@ -7,21 +7,26 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
+	goredis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"github.com/RenzIP/Graphic-Diagram-Online/config"
 	"github.com/RenzIP/Graphic-Diagram-Online/db"
 	"github.com/RenzIP/Graphic-Diagram-Online/handler"
+	"github.com/RenzIP/Graphic-Diagram-Online/model"
+	redissvc "github.com/RenzIP/Graphic-Diagram-Online/redis"
 	"github.com/RenzIP/Graphic-Diagram-Online/repository"
 	"github.com/RenzIP/Graphic-Diagram-Online/router"
 	"github.com/RenzIP/Graphic-Diagram-Online/service"
+	"github.com/RenzIP/Graphic-Diagram-Online/ws"
 )
 
 // Instance holds the initialized Fiber app and DB connection.
 type Instance struct {
-	App *fiber.App
-	DB  *gorm.DB
-	Cfg *config.Config
+	App   *fiber.App
+	DB    *gorm.DB
+	Cfg   *config.Config
+	Redis *goredis.Client // nil when Redis is unavailable
 }
 
 // New creates a fully wired Fiber application with all middleware,
@@ -35,7 +40,38 @@ func New() *Instance {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	
+	// AutoMigrate models
+	if err := database.AutoMigrate(&model.DocumentVersion{}); err != nil {
+		log.Fatalf("Failed to automigrate DocumentVersion: %v", err)
+	}
+	
 	log.Println("Connected to Supabase/PostgreSQL")
+
+	// --- Redis connection (graceful degradation) ---
+	var redisClient *goredis.Client
+	var lockSvc *redissvc.LockService
+	var presenceSvc *redissvc.PresenceService
+
+	if cfg.RedisURL != "" {
+		rc, err := redissvc.Connect(cfg.RedisURL)
+		if err != nil {
+			log.Printf("⚠ Redis unavailable (%v) — running without Redis", err)
+		} else {
+			redisClient = rc
+			lockSvc = redissvc.NewLockService(rc)
+			presenceSvc = redissvc.NewPresenceService(rc)
+			log.Println("Connected to Redis")
+		}
+	}
+
+	// --- WebSocket Hub ---
+	var hub *ws.Hub
+	if lockSvc != nil && presenceSvc != nil {
+		hub = ws.NewHubWithRedis(lockSvc, presenceSvc)
+	} else {
+		hub = ws.NewHub()
+	}
 
 	// --- Repository layer ---
 	userRepo := repository.NewUserRepo(database)
@@ -56,6 +92,7 @@ func New() *Instance {
 		Workspace: handler.NewWorkspaceHandler(wsSvc),
 		Project:   handler.NewProjectHandler(projSvc),
 		Document:  handler.NewDocumentHandler(docSvc),
+		Hub:       hub,
 	}
 
 	// Fiber app
@@ -68,14 +105,20 @@ func New() *Instance {
 	router.Setup(app, cfg, handlers)
 
 	return &Instance{
-		App: app,
-		DB:  database,
-		Cfg: cfg,
+		App:   app,
+		DB:    database,
+		Cfg:   cfg,
+		Redis: redisClient,
 	}
 }
 
-// Close gracefully shuts down the application (closes DB, etc).
+// Close gracefully shuts down the application (closes DB, Redis, etc).
 func (inst *Instance) Close() {
+	if inst.Redis != nil {
+		if err := inst.Redis.Close(); err != nil {
+			log.Printf("Error closing Redis: %v", err)
+		}
+	}
 	if inst.DB != nil {
 		db.Disconnect(inst.DB)
 	}
@@ -96,3 +139,4 @@ func fiberErrorHandler(c *fiber.Ctx, err error) error {
 		"message": message,
 	})
 }
+

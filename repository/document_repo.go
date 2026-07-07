@@ -79,6 +79,11 @@ func (r *DocumentRepo) Update(ctx context.Context, doc *model.Document) *pkg.App
 }
 
 func (r *DocumentRepo) Delete(ctx context.Context, id uuid.UUID) *pkg.AppError {
+	// Delete all historical versions first to avoid orphaned data (Cascade Delete)
+	if err := r.db.WithContext(ctx).Delete(&model.DocumentVersion{}, "document_id = ?", id).Error; err != nil {
+		return pkg.ErrInternal.WithMessage("failed to delete document versions").WithDetails(err.Error())
+	}
+
 	if err := r.db.WithContext(ctx).Delete(&model.Document{}, "id = ?", id).Error; err != nil {
 		return pkg.ErrInternal.WithMessage("failed to delete document").WithDetails(err.Error())
 	}
@@ -113,4 +118,50 @@ type RecentDocumentRow struct {
 	ProjectID     *uuid.UUID `json:"project_id"`
 	ProjectName   *string    `json:"project_name"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+func (r *DocumentRepo) CreateVersion(ctx context.Context, version *model.DocumentVersion) *pkg.AppError {
+	if err := r.db.WithContext(ctx).Create(version).Error; err != nil {
+		return pkg.ErrInternal.WithMessage("failed to create document version").WithDetails(err.Error())
+	}
+	return nil
+}
+
+func (r *DocumentRepo) ListVersions(ctx context.Context, documentID uuid.UUID) ([]model.DocumentVersion, *pkg.AppError) {
+	var versions []model.DocumentVersion
+	err := r.db.WithContext(ctx).
+		Where("document_id = ?", documentID).
+		Order("version desc").
+		Find(&versions).Error
+	if err != nil {
+		return nil, pkg.ErrInternal.WithMessage("failed to fetch document versions").WithDetails(err.Error())
+	}
+	return versions, nil
+}
+
+func (r *DocumentRepo) GetVersion(ctx context.Context, documentID uuid.UUID, version int) (*model.DocumentVersion, *pkg.AppError) {
+	docVer := new(model.DocumentVersion)
+	err := r.db.WithContext(ctx).First(docVer, "document_id = ? AND version = ?", documentID, version).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, pkg.ErrNotFound.WithMessage("document version not found")
+		}
+		return nil, pkg.ErrInternal.WithMessage("failed to fetch document version").WithDetails(err.Error())
+	}
+	return docVer, nil
+}
+
+func (r *DocumentRepo) GetLatestVersion(ctx context.Context, documentID uuid.UUID) (*model.DocumentVersion, *pkg.AppError) {
+	docVer := new(model.DocumentVersion)
+	err := r.db.WithContext(ctx).
+		Where("document_id = ?", documentID).
+		Order("version desc").
+		First(docVer).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil // Not found is acceptable, means no version exists yet
+		}
+		return nil, pkg.ErrInternal.WithMessage("failed to fetch latest document version").WithDetails(err.Error())
+	}
+	return docVer, nil
 }

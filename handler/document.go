@@ -132,3 +132,42 @@ func (h *DocumentHandler) Recent(c *fiber.Ctx) error {
 
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
+
+// ListVersions handles GET /api/documents/:id/versions.
+func (h *DocumentHandler) ListVersions(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	docID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid document ID"))
+	}
+
+	resp, appErr := h.docSvc.ListVersions(c.Context(), userID, docID)
+	if appErr != nil {
+		return handleError(c, appErr)
+	}
+
+	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
+}
+
+// RestoreVersion handles POST /api/documents/:id/versions/:version/restore.
+func (h *DocumentHandler) RestoreVersion(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	docID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid document ID"))
+	}
+
+	version, err := strconv.Atoi(c.Params("version"))
+	if err != nil {
+		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid version number"))
+	}
+
+	resp, appErr := h.docSvc.RestoreVersion(c.Context(), userID, docID, version)
+	if appErr != nil {
+		return handleError(c, appErr)
+	}
+
+	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
+}

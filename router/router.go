@@ -6,6 +6,7 @@ import (
 	"github.com/RenzIP/Graphic-Diagram-Online/config"
 	"github.com/RenzIP/Graphic-Diagram-Online/handler"
 	"github.com/RenzIP/Graphic-Diagram-Online/middleware"
+	"github.com/RenzIP/Graphic-Diagram-Online/ws"
 )
 
 type Handlers struct {
@@ -14,6 +15,7 @@ type Handlers struct {
 	Workspace *handler.WorkspaceHandler
 	Project   *handler.ProjectHandler
 	Document  *handler.DocumentHandler
+	Hub       *ws.Hub // WebSocket collaboration hub
 }
 
 func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
@@ -63,4 +65,13 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected.Post("/documents", h.Document.Create)
 	protected.Put("/documents/:id", h.Document.Update)
 	protected.Delete("/documents/:id", h.Document.Delete)
+	protected.Get("/documents/:id/versions", h.Document.ListVersions)
+	protected.Post("/documents/:id/versions/:version/restore", h.Document.RestoreVersion)
+
+	// --- WebSocket endpoint for realtime collaboration ---
+	if h.Hub != nil {
+		app.Use("/ws", ws.UpgradeMiddleware())
+		app.Get("/ws/:documentId", ws.HandleWebSocket(h.Hub))
+	}
 }
+

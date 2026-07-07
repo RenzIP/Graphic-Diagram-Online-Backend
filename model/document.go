@@ -64,3 +64,14 @@ type Document struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
+
+// DocumentVersion represents a historical snapshot of a document.
+type DocumentVersion struct {
+	ID         uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	DocumentID uuid.UUID  `json:"document_id" gorm:"type:uuid;not null;index"`
+	Version    int        `json:"version" gorm:"not null"`
+	Content    JSONB      `json:"content" gorm:"type:jsonb;not null"`
+	View       JSONB      `json:"view" gorm:"type:jsonb;not null"`
+	CreatedBy  *uuid.UUID `json:"created_by" gorm:"type:uuid"`
+	CreatedAt  time.Time  `json:"created_at"`
+}

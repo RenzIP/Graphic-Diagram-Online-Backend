@@ -170,8 +170,119 @@ func (s *DocumentService) Update(ctx context.Context, userID, docID uuid.UUID, r
 	}
 
 	if bumpVersion {
-		doc.Version++
+		// Fetch the latest version to apply 2-minute throttling
+		latestVer, appErr := s.docRepo.GetLatestVersion(ctx, doc.ID)
+		if appErr != nil {
+			return nil, appErr
+		}
+
+		shouldSnapshot := false
+		if latestVer == nil {
+			shouldSnapshot = true
+		} else if time.Since(latestVer.CreatedAt) > 2*time.Minute {
+			shouldSnapshot = true
+		}
+
+		if shouldSnapshot {
+			oldVersion := &model.DocumentVersion{
+				ID:         uuid.New(),
+				DocumentID: doc.ID,
+				Version:    doc.Version,
+				Content:    doc.Content,
+				View:       doc.View,
+				CreatedBy:  &userID,
+				CreatedAt:  time.Now(),
+			}
+			// If creation fails due to race condition (duplicate version), it's safe to ignore or error out. 
+			// We'll let it error out as CreateVersion logs it, but it shouldn't happen often with throttling.
+			if err := s.docRepo.CreateVersion(ctx, oldVersion); err != nil {
+				return nil, err
+			}
+			doc.Version++
+		}
 	}
+	doc.UpdatedAt = time.Now()
+
+	if appErr := s.docRepo.Update(ctx, doc); appErr != nil {
+		return nil, appErr
+	}
+
+	return toDocumentResp(doc), nil
+}
+
+// ListVersions returns all historical versions of a document.
+func (s *DocumentService) ListVersions(ctx context.Context, userID, docID uuid.UUID) (*dto.DocumentVersionListResp, *pkg.AppError) {
+	doc, appErr := s.docRepo.FindByID(ctx, docID)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	if _, appErr := s.wsSvc.RequireMembership(ctx, doc.WorkspaceID, userID); appErr != nil {
+		return nil, appErr
+	}
+
+	versions, appErr := s.docRepo.ListVersions(ctx, docID)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	items := make([]dto.DocumentVersionResp, 0, len(versions))
+	for _, v := range versions {
+		var createdBy *string
+		if v.CreatedBy != nil {
+			s := v.CreatedBy.String()
+			createdBy = &s
+		}
+		items = append(items, dto.DocumentVersionResp{
+			ID:        v.ID.String(),
+			Version:   v.Version,
+			Content:   json.RawMessage(v.Content),
+			View:      json.RawMessage(v.View),
+			CreatedBy: createdBy,
+			CreatedAt: v.CreatedAt,
+		})
+	}
+
+	return &dto.DocumentVersionListResp{Data: items}, nil
+}
+
+// RestoreVersion restores a document to a specific historical version.
+func (s *DocumentService) RestoreVersion(ctx context.Context, userID, docID uuid.UUID, version int) (*dto.DocumentResp, *pkg.AppError) {
+	doc, appErr := s.docRepo.FindByID(ctx, docID)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	role, appErr := s.wsSvc.RequireMembership(ctx, doc.WorkspaceID, userID)
+	if appErr != nil {
+		return nil, appErr
+	}
+	if role == "viewer" {
+		return nil, pkg.ErrForbidden.WithMessage("viewers cannot restore documents")
+	}
+
+	ver, appErr := s.docRepo.GetVersion(ctx, docID, version)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	// Save current state before restoring
+	currentVersion := &model.DocumentVersion{
+		ID:         uuid.New(),
+		DocumentID: doc.ID,
+		Version:    doc.Version,
+		Content:    doc.Content,
+		View:       doc.View,
+		CreatedBy:  &userID,
+		CreatedAt:  time.Now(),
+	}
+	if err := s.docRepo.CreateVersion(ctx, currentVersion); err != nil {
+		return nil, err
+	}
+
+	doc.Content = ver.Content
+	doc.View = ver.View
+	doc.Version++
 	doc.UpdatedAt = time.Now()
 
 	if appErr := s.docRepo.Update(ctx, doc); appErr != nil {
