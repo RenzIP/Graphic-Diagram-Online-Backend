@@ -58,7 +58,7 @@ func Load() *Config {
 	cfg := &Config{
 		Port:               getEnv("PORT", "8080"),
 		Env:                getEnv("ENV", "development"),
-		DatabaseURL:        getEnv("SUPABASE_DATABASE_URL", getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/gradiol?sslmode=disable")),
+		DatabaseURL:        getEnv("SUPABASE_DATABASE_URL", getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/gradiol")),
 		JWTSecret:          getEnv("JWT_SECRET", "dev-secret-change-me"),
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
@@ -111,7 +111,7 @@ func getEnvInt(key string, fallback int) int {
 }
 
 func loadDotEnv() {
-	for _, path := range []string{".env", "../.env", "../../.env"} {
+	for _, path := range []string{".env", "backend/.env", "../.env", "../../.env"} {
 		if _, err := os.Stat(path); err == nil {
 			_ = godotenv.Load(path)
 			return
