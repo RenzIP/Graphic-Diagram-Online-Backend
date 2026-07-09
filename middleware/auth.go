@@ -65,6 +65,11 @@ func Auth(jwtSecret string) fiber.Handler {
 			c.Locals("email", email)
 		}
 
+		// Extract role if present
+		if role, ok := claims["role"].(string); ok {
+			c.Locals("role", role)
+		}
+
 		return c.Next()
 	}
 }
@@ -76,4 +81,31 @@ func GetUserID(c *fiber.Ctx) uuid.UUID {
 		return id
 	}
 	return uuid.Nil
+}
+
+// GetRole extracts the authenticated user's role from ctx.Locals.
+func GetRole(c *fiber.Ctx) string {
+	if role, ok := c.Locals("role").(string); ok {
+		return role
+	}
+	return ""
+}
+
+// RequireRole returns a middleware that restricts access to specific roles.
+// It assumes Auth middleware has already run and populated ctx.Locals("role").
+func RequireRole(allowedRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userRole := GetRole(c)
+		if userRole == "" {
+			return pkg.WriteError(c, pkg.ErrUnauthorized.WithMessage("missing role information"))
+		}
+
+		for _, allowed := range allowedRoles {
+			if strings.EqualFold(userRole, allowed) {
+				return c.Next()
+			}
+		}
+
+		return pkg.WriteError(c, pkg.ErrForbidden.WithMessage("you do not have permission to perform this action"))
+	}
 }

@@ -49,24 +49,26 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected.Put("/change-password", h.Auth.ChangePassword)
 	protected.Post("/change-password", h.Auth.ChangePassword)
 
+	adminOnly := middleware.RequireRole("admin")
+
 	protected.Get("/workspaces", h.Workspace.List)
-	protected.Post("/workspaces", h.Workspace.Create)
-	protected.Put("/workspaces/:id", h.Workspace.Update)
-	protected.Delete("/workspaces/:id", h.Workspace.Delete)
+	protected.Post("/workspaces", adminOnly, h.Workspace.Create)
+	protected.Put("/workspaces/:id", adminOnly, h.Workspace.Update)
+	protected.Delete("/workspaces/:id", adminOnly, h.Workspace.Delete)
 
 	protected.Get("/workspaces/:id/projects", h.Project.ListByWorkspace)
-	protected.Post("/projects", h.Project.Create)
-	protected.Put("/projects/:id", h.Project.Update)
-	protected.Delete("/projects/:id", h.Project.Delete)
+	protected.Post("/projects", adminOnly, h.Project.Create)
+	protected.Put("/projects/:id", adminOnly, h.Project.Update)
+	protected.Delete("/projects/:id", adminOnly, h.Project.Delete)
 
 	protected.Get("/documents/recent", h.Document.Recent)
 	protected.Get("/projects/:id/documents", h.Document.ListByProject)
 	protected.Get("/documents/:id", h.Document.GetByID)
-	protected.Post("/documents", h.Document.Create)
-	protected.Put("/documents/:id", h.Document.Update)
-	protected.Delete("/documents/:id", h.Document.Delete)
+	protected.Post("/documents", adminOnly, h.Document.Create)
+	protected.Put("/documents/:id", adminOnly, h.Document.Update)
+	protected.Delete("/documents/:id", adminOnly, h.Document.Delete)
 	protected.Get("/documents/:id/versions", h.Document.ListVersions)
-	protected.Post("/documents/:id/versions/:version/restore", h.Document.RestoreVersion)
+	protected.Post("/documents/:id/versions/:version/restore", adminOnly, h.Document.RestoreVersion)
 
 	// --- WebSocket endpoint for realtime collaboration ---
 	if h.Hub != nil {
