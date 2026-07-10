@@ -84,7 +84,7 @@ jobs:
             --max-instances=10 \
             --cpu=1 \
             --concurrency=80 \
-            --build-env-vars=GOFLAGS=-buildvcs=false \
+            --set-build-env-vars=GOFLAGS=-buildvcs=false \
             --set-env-vars="\
           ENV=production,\
           LOG_LEVEL=info,\
