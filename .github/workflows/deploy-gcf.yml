@@ -82,6 +82,7 @@ jobs:
             --memory=512MiB \
             --min-instances=0 \
             --max-instances=10 \
+            --cpu=1 \
             --concurrency=80 \
             --set-env-vars="\
           ENV=production,\
