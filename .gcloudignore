@@ -1,0 +1,46 @@
+# Keep .gcloudignore in the deployed source (it's harmless and helps
+# ensure consistent behaviour between local and remote builds).
+
+# Environment
+.env
+
+# Binaries
+server
+bin/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub Actions (not needed at runtime)
+.github/
+
+# Render blueprint (not used by GCF)
+render.yaml
+
+# Local migration / seed tools (not needed at runtime)
+cmd/migrate/
+cmd/seed/
+migrations/
+
+# Markdown docs
+*.md
+!README.md
+
+# Test files
+*_test.go
+
+# Supabase local config
+supabase/
