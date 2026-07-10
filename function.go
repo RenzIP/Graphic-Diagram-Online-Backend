@@ -41,20 +41,32 @@ import (
 
 var (
 	instance *app.Instance
+	initErr  error
 	once     sync.Once
 )
-
-func init() {
-	once.Do(func() {
-		instance = app.New()
-		log.Println("GCF cold start complete — Fiber app initialized")
-	})
-}
 
 // Handle is the GCF Gen 2 HTTP entry point. It adapts the standard
 // net/http request to fasthttp (which Fiber v2 uses internally) and
 // copies the response back to the http.ResponseWriter.
+//
+// The application is initialized lazily on the first request (cold start).
+// If initialization fails, all requests will receive HTTP 503 until the
+// instance is replaced on the next cold start.
 func Handle(w http.ResponseWriter, r *http.Request) {
+	once.Do(func() {
+		instance, initErr = app.New()
+		if initErr != nil {
+			log.Printf("GCF app initialization failed: %v", initErr)
+		} else {
+			log.Println("GCF cold start complete — Fiber app initialized")
+		}
+	})
+
+	if initErr != nil {
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
 	ctx := &fasthttp.RequestCtx{}
 
 	// --- Convert net/http → fasthttp ---

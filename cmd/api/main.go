@@ -9,7 +9,10 @@ import (
 
 func main() {
 	// Initialize the full application (config, DB, DI, routes)
-	instance := app.New()
+	instance, err := app.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize app: %v", err)
+	}
 	defer instance.Close()
 
 	// Start server

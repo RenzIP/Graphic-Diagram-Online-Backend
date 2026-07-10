@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -51,8 +51,8 @@ type Config struct {
 }
 
 // Load reads environment variables and returns a validated Config.
-// Panics if required variables are missing in production.
-func Load() *Config {
+// Returns an error if required variables are missing in production.
+func Load() (*Config, error) {
 	loadDotEnv()
 
 	cfg := &Config{
@@ -79,14 +79,14 @@ func Load() *Config {
 	// Fail fast in production if critical config is missing
 	if cfg.Env == "production" {
 		if cfg.JWTSecret == "" || cfg.JWTSecret == "dev-secret-change-me" {
-			log.Fatal("JWT_SECRET is required in production (and must not be the default)")
+			return nil, fmt.Errorf("JWT_SECRET is required in production (and must not be the default)")
 		}
 		if cfg.DatabaseURL == "" {
-			log.Fatal("SUPABASE_DATABASE_URL or DATABASE_URL is required in production")
+			return nil, fmt.Errorf("SUPABASE_DATABASE_URL or DATABASE_URL is required in production")
 		}
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // IsDevelopment returns true when running in development mode.
