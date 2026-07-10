@@ -31,7 +31,7 @@ func (h *ProjectHandler) ListByWorkspace(c *fiber.Ctx) error {
 
 	pq := dto.ParsePagination(c.Query("page"), c.Query("per_page"))
 
-	resp, appErr := h.projSvc.ListByWorkspace(c.Context(), userID, wsID, pq)
+	resp, appErr := h.projSvc.ListByWorkspace(c.UserContext(), userID, wsID, pq)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -48,7 +48,7 @@ func (h *ProjectHandler) Create(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.projSvc.Create(c.Context(), userID, req)
+	resp, appErr := h.projSvc.Create(c.UserContext(), userID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -70,7 +70,7 @@ func (h *ProjectHandler) Update(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.projSvc.Update(c.Context(), userID, projID, req)
+	resp, appErr := h.projSvc.Update(c.UserContext(), userID, projID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -87,7 +87,7 @@ func (h *ProjectHandler) Delete(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid project ID"))
 	}
 
-	if appErr := h.projSvc.Delete(c.Context(), userID, projID); appErr != nil {
+	if appErr := h.projSvc.Delete(c.UserContext(), userID, projID); appErr != nil {
 		return handleError(c, appErr)
 	}
 

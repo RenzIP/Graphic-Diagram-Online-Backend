@@ -32,7 +32,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	user, appErr := h.authSvc.Register(c.Context(), req)
+	user, appErr := h.authSvc.Register(c.UserContext(), req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -51,7 +51,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	user, appErr := h.authSvc.Login(c.Context(), req)
+	user, appErr := h.authSvc.Login(c.UserContext(), req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -72,7 +72,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	if appErr := h.authSvc.ChangePassword(c.Context(), userID, req); appErr != nil {
+	if appErr := h.authSvc.ChangePassword(c.UserContext(), userID, req); appErr != nil {
 		return handleError(c, appErr)
 	}
 
@@ -84,7 +84,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
-	profile, appErr := h.authSvc.GetProfile(c.Context(), userID)
+	profile, appErr := h.authSvc.GetProfile(c.UserContext(), userID)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}

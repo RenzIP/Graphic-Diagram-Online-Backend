@@ -25,7 +25,7 @@ func (h *WorkspaceHandler) List(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	pq := dto.ParsePagination(c.Query("page"), c.Query("per_page"))
 
-	resp, appErr := h.wsSvc.ListByUser(c.Context(), userID, pq)
+	resp, appErr := h.wsSvc.ListByUser(c.UserContext(), userID, pq)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -42,7 +42,7 @@ func (h *WorkspaceHandler) Create(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.wsSvc.Create(c.Context(), userID, req)
+	resp, appErr := h.wsSvc.Create(c.UserContext(), userID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -64,7 +64,7 @@ func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.wsSvc.Update(c.Context(), userID, wsID, req)
+	resp, appErr := h.wsSvc.Update(c.UserContext(), userID, wsID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -81,7 +81,7 @@ func (h *WorkspaceHandler) Delete(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid workspace ID"))
 	}
 
-	if appErr := h.wsSvc.Delete(c.Context(), userID, wsID); appErr != nil {
+	if appErr := h.wsSvc.Delete(c.UserContext(), userID, wsID); appErr != nil {
 		return handleError(c, appErr)
 	}
 

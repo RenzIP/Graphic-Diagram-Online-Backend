@@ -36,7 +36,7 @@ func (h *DocumentHandler) ListByProject(c *fiber.Ctx) error {
 	sortBy := c.Query("sort_by", "updated_at")
 	sortOrder := c.Query("sort_order", "desc")
 
-	resp, appErr := h.docSvc.ListByProject(c.Context(), userID, projID, pq, diagramType, sortBy, sortOrder)
+	resp, appErr := h.docSvc.ListByProject(c.UserContext(), userID, projID, pq, diagramType, sortBy, sortOrder)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -53,7 +53,7 @@ func (h *DocumentHandler) GetByID(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid document ID"))
 	}
 
-	resp, appErr := h.docSvc.GetByID(c.Context(), userID, docID)
+	resp, appErr := h.docSvc.GetByID(c.UserContext(), userID, docID)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -70,7 +70,7 @@ func (h *DocumentHandler) Create(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.docSvc.Create(c.Context(), userID, req)
+	resp, appErr := h.docSvc.Create(c.UserContext(), userID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -92,7 +92,7 @@ func (h *DocumentHandler) Update(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
 	}
 
-	resp, appErr := h.docSvc.Update(c.Context(), userID, docID, req)
+	resp, appErr := h.docSvc.Update(c.UserContext(), userID, docID, req)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -109,7 +109,7 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid document ID"))
 	}
 
-	if appErr := h.docSvc.Delete(c.Context(), userID, docID); appErr != nil {
+	if appErr := h.docSvc.Delete(c.UserContext(), userID, docID); appErr != nil {
 		return handleError(c, appErr)
 	}
 
@@ -125,7 +125,7 @@ func (h *DocumentHandler) Recent(c *fiber.Ctx) error {
 		limit = v
 	}
 
-	resp, appErr := h.docSvc.ListRecent(c.Context(), userID, limit)
+	resp, appErr := h.docSvc.ListRecent(c.UserContext(), userID, limit)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -142,7 +142,7 @@ func (h *DocumentHandler) ListVersions(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid document ID"))
 	}
 
-	resp, appErr := h.docSvc.ListVersions(c.Context(), userID, docID)
+	resp, appErr := h.docSvc.ListVersions(c.UserContext(), userID, docID)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
@@ -164,7 +164,7 @@ func (h *DocumentHandler) RestoreVersion(c *fiber.Ctx) error {
 		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid version number"))
 	}
 
-	resp, appErr := h.docSvc.RestoreVersion(c.Context(), userID, docID, version)
+	resp, appErr := h.docSvc.RestoreVersion(c.UserContext(), userID, docID, version)
 	if appErr != nil {
 		return handleError(c, appErr)
 	}
