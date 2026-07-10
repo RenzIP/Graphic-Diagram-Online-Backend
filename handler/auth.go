@@ -103,24 +103,29 @@ func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) GoogleCallback(c *fiber.Ctx) error {
+	log.Println("[Auth] GoogleCallback handler entered")
 	code := c.Query("code")
 	if code == "" {
+		log.Println("[Auth] Google callback error: missing authorization code")
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=missing_code", fiber.StatusTemporaryRedirect)
 	}
 
 	redirectURI := h.oauthRedirectURI("google")
+	log.Printf("[Auth] Exchanging Google code. redirect_uri=%s", redirectURI)
 	tokenResp, err := exchangeGoogleCode(code, h.cfg.GoogleClientID, h.cfg.GoogleClientSecret, redirectURI)
 	if err != nil {
 		log.Printf("[Auth] Google code exchange failed: %v", err)
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=exchange_failed", fiber.StatusTemporaryRedirect)
 	}
 
+	log.Println("[Auth] Fetching Google user info")
 	userInfo, err := fetchGoogleUserInfo(tokenResp.AccessToken)
 	if err != nil {
 		log.Printf("[Auth] Google user info failed: %v", err)
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=userinfo_failed", fiber.StatusTemporaryRedirect)
 	}
 
+	log.Printf("[Auth] Completing Google OAuth for sub=%s, email=%s", userInfo.Sub, userInfo.Email)
 	return h.completeOAuth(c, userInfo.Sub, userInfo.Email, userInfo.Name, userInfo.Picture)
 }
 
@@ -158,17 +163,21 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) completeOAuth(c *fiber.Ctx, providerUserID, email, fullName, avatarURL string) error {
+	log.Printf("[Auth] completeOAuth starting for providerUserID=%s", providerUserID)
 	userID, err := uuid.Parse(providerUserID)
 	if err != nil {
+		log.Printf("[Auth] Parsing providerUserID to UUID failed: %v. Generating SHA1 instead.", err)
 		userID = uuid.NewSHA1(uuid.NameSpaceURL, []byte(providerUserID))
 	}
 
-	if appErr := h.authSvc.UpsertProfile(c.Context(), userID, email, strPtr(fullName), strPtr(avatarURL)); appErr != nil {
+	log.Printf("[Auth] Upserting user profile. ID=%s, email=%s", userID, email)
+	if appErr := h.authSvc.UpsertProfile(c.UserContext(), userID, email, strPtr(fullName), strPtr(avatarURL)); appErr != nil {
 		log.Printf("[Auth] Upsert failed for user %s: %v", userID, appErr)
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=profile_failed", fiber.StatusTemporaryRedirect)
 	}
 
 	username := usernameForToken(email, fullName, userID)
+	log.Printf("[Auth] Signing JWT token for username=%s", username)
 	token, err := h.signJWT(userID, username, "user")
 	if err != nil {
 		log.Printf("[Auth] JWT signing failed: %v", err)
@@ -176,6 +185,7 @@ func (h *AuthHandler) completeOAuth(c *fiber.Ctx, providerUserID, email, fullNam
 	}
 
 	callbackURL := fmt.Sprintf("%s/auth/callback?token=%s", h.cfg.FrontendURL, token)
+	log.Printf("[Auth] OAuth login successful. Redirecting to callbackURL=%s", callbackURL)
 	return c.Redirect(callbackURL, fiber.StatusTemporaryRedirect)
 }
 
