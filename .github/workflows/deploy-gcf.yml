@@ -89,15 +89,15 @@ jobs:
           ENV=production,\
           LOG_LEVEL=info,\
           LOG_FORMAT=text,\
-          JWT_SECRET='${{ secrets.JWT_SECRET }}',\
-          SUPABASE_DATABASE_URL='${{ secrets.SUPABASE_DATABASE_URL }}',\
-          FRONTEND_URL='${{ secrets.FRONTEND_URL }}',\
-          BACKEND_URL='${{ secrets.BACKEND_URL }}',\
-          REDIS_URL='${{ secrets.REDIS_URL }}',\
-          GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}',\
-          GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}',\
-          GITHUB_CLIENT_ID='${{ secrets.G_CLIENT_ID }}',\
-          GITHUB_CLIENT_SECRET='${{ secrets.G_CLIENT_SECRET }}'"
+          JWT_SECRET=${{ secrets.JWT_SECRET }},\
+          SUPABASE_DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }},\
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }},\
+          BACKEND_URL=${{ secrets.BACKEND_URL }},\
+          REDIS_URL=${{ secrets.REDIS_URL }},\
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},\
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},\
+          GITHUB_CLIENT_ID=${{ secrets.G_CLIENT_ID }},\
+          GITHUB_CLIENT_SECRET=${{ secrets.G_CLIENT_SECRET }}"
 
       - name: Show deployed URL
         run: |
