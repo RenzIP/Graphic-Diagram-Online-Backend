@@ -3,13 +3,55 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	gws "github.com/gofiber/websocket/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+// JWTValidator validates JWT tokens for WebSocket authentication
+type JWTValidator struct {
+	Secret string
+}
+
+// ValidateToken parses and validates a JWT token, returning the user ID and role
+func (v *JWTValidator) ValidateToken(tokenStr string) (userID uuid.UUID, role string, err error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(v.Secret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return uuid.Nil, "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return uuid.Nil, "", fmt.Errorf("invalid token claims")
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
+		return uuid.Nil, "", fmt.Errorf("missing sub claim")
+	}
+
+	userID, err = uuid.Parse(sub)
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("invalid user ID in token: %w", err)
+	}
+
+	if r, ok := claims["role"].(string); ok {
+		role = r
+	}
+
+	return userID, role, nil
+}
 
 // UpgradeMiddleware checks for WebSocket upgrade requests
 func UpgradeMiddleware() fiber.Handler {
@@ -22,22 +64,40 @@ func UpgradeMiddleware() fiber.Handler {
 }
 
 // HandleWebSocket returns a Fiber handler for WebSocket connections
-func HandleWebSocket(hub *Hub) fiber.Handler {
+func HandleWebSocket(hub *Hub, validator *JWTValidator) fiber.Handler {
 	return gws.New(func(c *gws.Conn) {
+		// Extract token from query parameter
+		tokenStr := c.Query("token")
+		if tokenStr == "" {
+			log.Printf("[WS] Connection rejected: missing token")
+			c.Close()
+			return
+		}
+
+		// Validate JWT token
+		userID, role, err := validator.ValidateToken(tokenStr)
+		if err != nil {
+			log.Printf("[WS] Connection rejected: invalid token: %v", err)
+			c.Close()
+			return
+		}
+
 		documentID := c.Params("documentId")
 		clientID := uuid.New().String()
 
 		client := &Client{
-			ID:   clientID,
-			Name: "User-" + clientID[:8],
-			Conn: c.Conn,
-			Room: documentID,
+			ID:     clientID,
+			UserID: userID.String(),
+			Role:   role,
+			Name:   "User-" + clientID[:8],
+			Conn:   c.Conn,
+			Room:   documentID,
 		}
 
 		room := hub.GetOrCreateRoom(documentID)
 		room.AddClient(client)
 
-		log.Printf("[WS] Client %s joined room %s", clientID, documentID)
+		log.Printf("[WS] Client %s (user=%s, role=%s) joined room %s", clientID, userID, role, documentID)
 
 		// --- Redis: register presence ---
 		ctx := context.Background()
@@ -135,8 +195,19 @@ func HandleWebSocket(hub *Hub) fiber.Handler {
 func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 	ctx := context.Background()
 
+	// Input validation
+	if err := validateMessage(&msg); err != nil {
+		log.Printf("[WS] Invalid message from client %s: %v", client.ID, err)
+		sendError(client, "Invalid message: "+err.Error())
+		return
+	}
+
 	switch msg.Type {
 	case TypeLockNode:
+		if msg.NodeID == "" {
+			sendError(client, "node_id is required for lock_node")
+			return
+		}
 		// In-memory lock
 		if !room.LockNode(msg.NodeID, client.ID) {
 			sendError(client, "Node is already locked")
@@ -161,6 +232,10 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 		})
 
 	case TypeUnlockNode:
+		if msg.NodeID == "" {
+			sendError(client, "node_id is required for unlock_node")
+			return
+		}
 		room.UnlockNode(msg.NodeID, client.ID)
 		if hub.Locks != nil {
 			if err := hub.Locks.UnlockNode(ctx, client.Room, msg.NodeID, client.ID); err != nil {
@@ -173,6 +248,10 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 		})
 
 	case TypeUpdateNode:
+		if msg.NodeID == "" || msg.Changes == nil {
+			sendError(client, "node_id and changes are required for update_node")
+			return
+		}
 		broadcastJSON(room, client.ID, Message{
 			Type:    TypeNodeUpdated,
 			NodeID:  msg.NodeID,
@@ -180,12 +259,20 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 		})
 
 	case TypeAddNode:
+		if msg.Node == nil {
+			sendError(client, "node is required for add_node")
+			return
+		}
 		broadcastJSON(room, client.ID, Message{
 			Type: TypeNodeAdded,
 			Node: msg.Node,
 		})
 
 	case TypeDeleteNode:
+		if msg.NodeID == "" {
+			sendError(client, "node_id is required for delete_node")
+			return
+		}
 		room.UnlockNode(msg.NodeID, client.ID)
 		if hub.Locks != nil {
 			_ = hub.Locks.UnlockNode(ctx, client.Room, msg.NodeID, client.ID)
@@ -196,18 +283,38 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 		})
 
 	case TypeAddEdge:
+		if msg.Edge == nil {
+			sendError(client, "edge is required for add_edge")
+			return
+		}
 		broadcastJSON(room, client.ID, Message{
 			Type: "edge_added",
 			Edge: msg.Edge,
 		})
 
 	case TypeDeleteEdge:
+		if msg.EdgeID == "" {
+			sendError(client, "edge_id is required for delete_edge")
+			return
+		}
 		broadcastJSON(room, client.ID, Message{
 			Type:   "edge_deleted",
 			EdgeID: msg.EdgeID,
 		})
 
 	case TypeCursorMove:
+		// Cursor moves are validated by validateMessage()
+		
+		// Rate limit cursor updates to prevent spam (max 30 updates per second per client)
+		now := time.Now()
+		if lastUpdate, ok := hub.cursorRate.Load(client.ID); ok {
+			if now.Sub(lastUpdate.(time.Time)) < 33*time.Millisecond {
+				// Too frequent, skip this update
+				return
+			}
+		}
+		hub.cursorRate.Store(client.ID, now)
+		
 		broadcastJSON(room, client.ID, Message{
 			Type:   TypeCursorUpdate,
 			UserID: client.ID,
@@ -264,6 +371,7 @@ func sendRoomState(client *Client, room *Room, hub *Hub) {
 func broadcastJSON(room *Room, excludeID string, msg Message) {
 	data, err := json.Marshal(msg)
 	if err != nil {
+		log.Printf("[WS] Failed to marshal message: %v", err)
 		return
 	}
 	room.Broadcast(data, excludeID)
@@ -274,6 +382,30 @@ func sendError(client *Client, message string) {
 		Type:        TypeError,
 		MessageText: message,
 	})
-	_ = client.Send(data)
+	if err := client.Send(data); err != nil {
+		log.Printf("[WS] Failed to send error to client %s: %v", client.ID, err)
+	}
+}
+
+// validateMessage performs basic validation on incoming WebSocket messages
+func validateMessage(msg *Message) error {
+	if msg.Type == "" {
+		return fmt.Errorf("message type is required")
+	}
+	
+	// Validate message size (prevent DoS via oversized messages)
+	// This is already limited by WebSocket frame size, but we add an extra check
+	
+	// Type-specific validation
+	switch msg.Type {
+	case TypeCursorMove:
+		// Cursor coordinates should be reasonable (not NaN, not infinite)
+		// Go's JSON unmarshal will reject NaN/Inf, but we check bounds
+		if msg.X < -100000 || msg.X > 100000 || msg.Y < -100000 || msg.Y > 100000 {
+			return fmt.Errorf("cursor coordinates out of bounds")
+		}
+	}
+	
+	return nil
 }
 

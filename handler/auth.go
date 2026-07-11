@@ -94,16 +94,45 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 
 func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 	redirectURI := h.oauthRedirectURI("google")
+	
+	// Generate CSRF state parameter
+	state := uuid.New().String()
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HTTPOnly: true,
+		Secure:   h.cfg.Env == "production",
+		SameSite: "Lax",
+		MaxAge:   600, // 10 minutes
+	})
+	
 	url := fmt.Sprintf(
-		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=openid%%20email%%20profile&access_type=offline&prompt=consent",
+		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=openid%%20email%%20profile&access_type=offline&prompt=consent&state=%s",
 		h.cfg.GoogleClientID,
 		redirectURI,
+		state,
 	)
 	return c.Redirect(url, fiber.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) GoogleCallback(c *fiber.Ctx) error {
 	log.Println("[Auth] GoogleCallback handler entered")
+	
+	// Verify CSRF state parameter
+	state := c.Query("state")
+	cookieState := c.Cookies("oauth_state")
+	if state == "" || cookieState == "" || state != cookieState {
+		log.Printf("[Auth] Google callback CSRF validation failed: state=%s, cookie=%s", state, cookieState)
+		return c.Redirect(h.cfg.FrontendURL+"/login?error=csrf_validation_failed", fiber.StatusTemporaryRedirect)
+	}
+	// Clear the state cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		HTTPOnly: true,
+		MaxAge:   -1,
+	})
+	
 	code := c.Query("code")
 	if code == "" {
 		log.Println("[Auth] Google callback error: missing authorization code")
@@ -131,15 +160,43 @@ func (h *AuthHandler) GoogleCallback(c *fiber.Ctx) error {
 
 func (h *AuthHandler) GitHubLogin(c *fiber.Ctx) error {
 	redirectURI := h.oauthRedirectURI("github")
+	
+	// Generate CSRF state parameter
+	state := uuid.New().String()
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HTTPOnly: true,
+		Secure:   h.cfg.Env == "production",
+		SameSite: "Lax",
+		MaxAge:   600, // 10 minutes
+	})
+	
 	url := fmt.Sprintf(
-		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email",
+		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email&state=%s",
 		h.cfg.GitHubClientID,
 		redirectURI,
+		state,
 	)
 	return c.Redirect(url, fiber.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
+	// Verify CSRF state parameter
+	state := c.Query("state")
+	cookieState := c.Cookies("oauth_state")
+	if state == "" || cookieState == "" || state != cookieState {
+		log.Printf("[Auth] GitHub callback CSRF validation failed: state=%s, cookie=%s", state, cookieState)
+		return c.Redirect(h.cfg.FrontendURL+"/login?error=csrf_validation_failed", fiber.StatusTemporaryRedirect)
+	}
+	// Clear the state cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		HTTPOnly: true,
+		MaxAge:   -1,
+	})
+	
 	code := c.Query("code")
 	if code == "" {
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=missing_code", fiber.StatusTemporaryRedirect)
@@ -163,29 +220,25 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 }
 
 func (h *AuthHandler) completeOAuth(c *fiber.Ctx, providerUserID, email, fullName, avatarURL string) error {
-	log.Printf("[Auth] completeOAuth starting for providerUserID=%s", providerUserID)
 	userID, err := uuid.Parse(providerUserID)
 	if err != nil {
-		log.Printf("[Auth] Parsing providerUserID to UUID failed: %v. Generating SHA1 instead.", err)
 		userID = uuid.NewSHA1(uuid.NameSpaceURL, []byte(providerUserID))
 	}
 
-	log.Printf("[Auth] Upserting user profile. ID=%s, email=%s", userID, email)
-	if appErr := h.authSvc.UpsertProfile(c.UserContext(), userID, email, strPtr(fullName), strPtr(avatarURL)); appErr != nil {
-		log.Printf("[Auth] Upsert failed for user %s: %v", userID, appErr)
+	// Upsert user and get the profile with role from DB
+	user, appErr := h.authSvc.UpsertProfile(c.UserContext(), userID, email, strPtr(fullName), strPtr(avatarURL))
+	if appErr != nil {
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=profile_failed", fiber.StatusTemporaryRedirect)
 	}
 
+	// Use role from database, not hardcoded "user"
 	username := usernameForToken(email, fullName, userID)
-	log.Printf("[Auth] Signing JWT token for username=%s", username)
-	token, err := h.signJWT(userID, username, "user")
+	token, err := h.signJWT(userID, username, user.Role)
 	if err != nil {
-		log.Printf("[Auth] JWT signing failed: %v", err)
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=token_failed", fiber.StatusTemporaryRedirect)
 	}
 
-	callbackURL := fmt.Sprintf("%s/auth/callback?token=%s", h.cfg.FrontendURL, token)
-	log.Printf("[Auth] OAuth login successful. Redirecting to callbackURL=%s", callbackURL)
+	callbackURL := fmt.Sprintf("%s/auth/callback#token=%s", h.cfg.FrontendURL, token)
 	return c.Redirect(callbackURL, fiber.StatusTemporaryRedirect)
 }
 

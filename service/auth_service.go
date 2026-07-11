@@ -36,10 +36,6 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*dto.Au
 
 func (s *AuthService) Register(ctx context.Context, req dto.RegisterReq) (*model.UserProfile, *pkg.AppError) {
 	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
-	req.Role = strings.ToLower(strings.TrimSpace(req.Role))
-	if req.Role == "" {
-		req.Role = "user"
-	}
 
 	if appErr := pkg.Validate(req); appErr != nil {
 		return nil, appErr
@@ -63,7 +59,7 @@ func (s *AuthService) Register(ctx context.Context, req dto.RegisterReq) (*model
 		ID:        uuid.New(),
 		Username:  req.Username,
 		Password:  &hash,
-		Role:      req.Role,
+		Role:      "user", // Always force to "user" - never accept from client
 		CreatedAt: time.Now(),
 	}
 	if appErr := s.userRepo.Create(ctx, user); appErr != nil {
@@ -124,7 +120,7 @@ func (s *AuthService) UserResponse(user *model.UserProfile) dto.AuthUserResp {
 	return *userResponse(user)
 }
 
-func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email string, fullName, avatarURL *string) *pkg.AppError {
+func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email string, fullName, avatarURL *string) (*model.UserProfile, *pkg.AppError) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	username := usernameFromOAuth(email, fullName, userID)
 
@@ -134,7 +130,6 @@ func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email
 		Email:     optionalString(email),
 		FullName:  fullName,
 		AvatarURL: avatarURL,
-		Role:      "user",
 		CreatedAt: time.Now(),
 	}
 

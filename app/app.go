@@ -77,6 +77,9 @@ func New() (*Instance, error) {
 		hub = ws.NewHub()
 	}
 
+	// --- JWT Validator for WebSocket ---
+	validator := &ws.JWTValidator{Secret: cfg.JWTSecret}
+
 	// --- Repository layer ---
 	userRepo := repository.NewUserRepo(database)
 	wsRepo := repository.NewWorkspaceRepo(database)
@@ -97,6 +100,7 @@ func New() (*Instance, error) {
 		Project:   handler.NewProjectHandler(projSvc),
 		Document:  handler.NewDocumentHandler(docSvc),
 		Hub:       hub,
+		Validator: validator,
 	}
 
 	// Fiber app

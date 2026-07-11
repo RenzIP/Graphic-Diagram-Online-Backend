@@ -15,7 +15,8 @@ type Handlers struct {
 	Workspace *handler.WorkspaceHandler
 	Project   *handler.ProjectHandler
 	Document  *handler.DocumentHandler
-	Hub       *ws.Hub // WebSocket collaboration hub
+	Hub       *ws.Hub            // WebSocket collaboration hub
+	Validator *ws.JWTValidator   // JWT validator for WebSocket auth
 }
 
 func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
@@ -71,9 +72,9 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected.Post("/documents/:id/versions/:version/restore", adminOnly, h.Document.RestoreVersion)
 
 	// --- WebSocket endpoint for realtime collaboration ---
-	if h.Hub != nil {
+	if h.Hub != nil && h.Validator != nil {
 		app.Use("/ws", ws.UpgradeMiddleware())
-		app.Get("/ws/:documentId", ws.HandleWebSocket(h.Hub))
+		app.Get("/ws/:documentId", ws.HandleWebSocket(h.Hub, h.Validator))
 	}
 }
 

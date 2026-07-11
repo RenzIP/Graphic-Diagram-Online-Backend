@@ -10,11 +10,13 @@ import (
 
 // Client represents a single WebSocket connection
 type Client struct {
-	ID   string
-	Name string
-	Conn *websocket.Conn
-	Room string
-	mu   sync.Mutex
+	ID     string
+	UserID string // Authenticated user ID from JWT
+	Role   string // User role from JWT
+	Name   string
+	Conn   *websocket.Conn
+	Room   string
+	mu     sync.Mutex
 }
 
 func (c *Client) Send(msg []byte) error {
@@ -94,10 +96,11 @@ func (r *Room) IsEmpty() bool {
 
 // Hub manages all rooms and optionally delegates durable state to Redis.
 type Hub struct {
-	rooms    map[string]*Room
-	mu       sync.RWMutex
-	Locks    *redissvc.LockService     // nil when Redis is unavailable
-	Presence *redissvc.PresenceService // nil when Redis is unavailable
+	rooms      map[string]*Room
+	mu         sync.RWMutex
+	Locks      *redissvc.LockService     // nil when Redis is unavailable
+	Presence   *redissvc.PresenceService // nil when Redis is unavailable
+	cursorRate sync.Map                  // clientID -> lastCursorUpdate time
 }
 
 // NewHub creates a Hub without Redis backing (in-memory only).

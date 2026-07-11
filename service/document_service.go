@@ -211,6 +211,7 @@ func (s *DocumentService) Update(ctx context.Context, userID, docID uuid.UUID, r
 }
 
 // ListVersions returns all historical versions of a document.
+// Limits to most recent 50 versions to prevent unbounded growth.
 func (s *DocumentService) ListVersions(ctx context.Context, userID, docID uuid.UUID) (*dto.DocumentVersionListResp, *pkg.AppError) {
 	doc, appErr := s.docRepo.FindByID(ctx, docID)
 	if appErr != nil {
@@ -224,6 +225,11 @@ func (s *DocumentService) ListVersions(ctx context.Context, userID, docID uuid.U
 	versions, appErr := s.docRepo.ListVersions(ctx, docID)
 	if appErr != nil {
 		return nil, appErr
+	}
+
+	// Limit to most recent 50 versions
+	if len(versions) > 50 {
+		versions = versions[:50]
 	}
 
 	items := make([]dto.DocumentVersionResp, 0, len(versions))
