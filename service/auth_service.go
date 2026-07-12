@@ -143,9 +143,12 @@ func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email
 
 func userResponse(user *model.UserProfile) *dto.AuthMeResp {
 	return &dto.AuthMeResp{
-		ID:       user.ID.String(),
-		Username: user.Username,
-		Role:     user.Role,
+		ID:        user.ID.String(),
+		Username:  user.Username,
+		Role:      user.Role,
+		Email:     user.Email,
+		FullName:  user.FullName,
+		AvatarURL: user.AvatarURL,
 	}
 }
 

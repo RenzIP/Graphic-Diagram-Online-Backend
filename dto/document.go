@@ -10,7 +10,7 @@ type CreateDocumentReq struct {
 	WorkspaceID string           `json:"workspace_id" validate:"required,uuid"`
 	ProjectID   *string          `json:"project_id"   validate:"omitempty,uuid"`
 	Title       string           `json:"title"        validate:"omitempty,max=200"`
-	DiagramType string           `json:"diagram_type" validate:"required,oneof=flowchart erd usecase"`
+	DiagramType string           `json:"diagram_type" validate:"required,oneof=flowchart erd usecase sequence mindmap blank"`
 	Content     *json.RawMessage `json:"content"`
 	View        *json.RawMessage `json:"view"`
 }

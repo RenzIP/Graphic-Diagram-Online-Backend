@@ -9,7 +9,7 @@ CREATE TABLE documents (
     project_id   UUID REFERENCES projects(id) ON DELETE SET NULL,
     workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     title        TEXT NOT NULL DEFAULT 'Untitled',
-    diagram_type TEXT NOT NULL CHECK (diagram_type IN ('flowchart', 'erd', 'usecase')),
+    diagram_type TEXT NOT NULL CHECK (diagram_type IN ('flowchart', 'erd', 'usecase', 'sequence', 'mindmap', 'blank')),
     content      JSONB NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
     view         JSONB NOT NULL DEFAULT '{"positions":{},"styles":{},"routing":{}}',
     version      INT NOT NULL DEFAULT 1 CHECK (version >= 1),

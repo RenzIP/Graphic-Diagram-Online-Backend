@@ -164,7 +164,7 @@ create table if not exists documents (
 	project_id uuid references projects(id) on delete set null,
 	workspace_id uuid not null references workspaces(id) on delete cascade,
 	title text not null,
-	diagram_type text not null check (diagram_type in ('flowchart', 'erd', 'usecase')),
+	diagram_type text not null check (diagram_type in ('flowchart', 'erd', 'usecase', 'sequence', 'mindmap', 'blank')),
 	content jsonb not null default '{"nodes":[],"edges":[]}'::jsonb,
 	view jsonb not null default '{"positions":{},"styles":{},"routing":{}}'::jsonb,
 	version integer not null default 1,
