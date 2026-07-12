@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/RenzIP/Graphic-Diagram-Online/model"
 	"github.com/RenzIP/Graphic-Diagram-Online/pkg"
@@ -103,26 +102,37 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, password st
 	return nil
 }
 
-func (r *UserRepo) Upsert(ctx context.Context, user *model.UserProfile) *pkg.AppError {
-	if err := r.db.WithContext(ctx).
-		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"username",
-				"email",
-				"full_name",
-				"avatar_url",
-				"role",
-			}),
-		}).
-		Create(user).Error; err != nil {
-		if isDuplicateError(err) {
-			return pkg.ErrConflict.WithMessage("username already registered")
-		}
-		return pkg.ErrInternal.WithMessage("failed to upsert user")
+func (r *UserRepo) Upsert(ctx context.Context, user *model.UserProfile) (*model.UserProfile, *pkg.AppError) {
+	// Check if user exists first
+	existing, err := r.FindByID(ctx, user.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	if existing == nil {
+		// New user - create with default role
+		user.Role = "user"
+		if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
+			if isDuplicateError(err) {
+				return nil, pkg.ErrConflict.WithMessage("username already registered")
+			}
+			return nil, pkg.ErrInternal.WithMessage("failed to create user")
+		}
+		return user, nil
+	}
+
+	// Existing user - update profile but preserve role
+	existing.Username = user.Username
+	existing.Email = user.Email
+	existing.FullName = user.FullName
+	existing.AvatarURL = user.AvatarURL
+	// Do NOT update Role - preserve existing role from DB
+
+	if err := r.db.WithContext(ctx).Save(existing).Error; err != nil {
+		return nil, pkg.ErrInternal.WithMessage("failed to update user profile")
+	}
+
+	return existing, nil
 }
 
 func isDuplicateError(err error) bool {

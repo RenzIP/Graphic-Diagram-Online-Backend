@@ -6,7 +6,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+// oauthHTTPClient is a custom HTTP client with timeout for OAuth requests
+var oauthHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 // ─── Google OAuth helpers ───────────────────────────────
 
@@ -35,7 +41,7 @@ func exchangeGoogleCode(code, clientID, clientSecret, redirectURI string) (*goog
 		"grant_type":    {"authorization_code"},
 	}
 
-	resp, err := http.PostForm("https://oauth2.googleapis.com/token", data)
+	resp, err := oauthHTTPClient.PostForm("https://oauth2.googleapis.com/token", data)
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}
@@ -57,7 +63,7 @@ func fetchGoogleUserInfo(accessToken string) (*googleUserInfo, error) {
 	req, _ := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)
 	}
@@ -97,7 +103,7 @@ func exchangeGitHubCode(code, clientID, clientSecret, redirectURI string) (strin
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("token request failed: %w", err)
 	}
@@ -124,7 +130,7 @@ func fetchGitHubUserInfo(accessToken string) (*gitHubUserInfo, error) {
 	req.Header.Set("Authorization", "token "+accessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("user request failed: %w", err)
 	}
@@ -154,7 +160,7 @@ func fetchGitHubPrimaryEmail(accessToken string) (string, error) {
 	req.Header.Set("Authorization", "token "+accessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}

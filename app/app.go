@@ -4,6 +4,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -31,21 +32,24 @@ type Instance struct {
 
 // New creates a fully wired Fiber application with all middleware,
 // routes, and dependency injection configured.
-func New() *Instance {
+func New() (*Instance, error) {
 	// Load config
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("config load: %w", err)
+	}
 
 	// Connect to database
 	database, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return nil, fmt.Errorf("database connect: %w", err)
 	}
-	
+
 	// AutoMigrate models
 	if err := database.AutoMigrate(&model.DocumentVersion{}); err != nil {
-		log.Fatalf("Failed to automigrate DocumentVersion: %v", err)
+		return nil, fmt.Errorf("automigrate: %w", err)
 	}
-	
+
 	log.Println("Connected to Supabase/PostgreSQL")
 
 	// --- Redis connection (graceful degradation) ---
@@ -73,6 +77,9 @@ func New() *Instance {
 		hub = ws.NewHub()
 	}
 
+	// --- JWT Validator for WebSocket ---
+	validator := &ws.JWTValidator{Secret: cfg.JWTSecret}
+
 	// --- Repository layer ---
 	userRepo := repository.NewUserRepo(database)
 	wsRepo := repository.NewWorkspaceRepo(database)
@@ -93,6 +100,7 @@ func New() *Instance {
 		Project:   handler.NewProjectHandler(projSvc),
 		Document:  handler.NewDocumentHandler(docSvc),
 		Hub:       hub,
+		Validator: validator,
 	}
 
 	// Fiber app
@@ -109,7 +117,7 @@ func New() *Instance {
 		DB:    database,
 		Cfg:   cfg,
 		Redis: redisClient,
-	}
+	}, nil
 }
 
 // Close gracefully shuts down the application (closes DB, Redis, etc).

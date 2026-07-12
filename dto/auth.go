@@ -8,7 +8,6 @@ type AuthCallbackReq struct {
 type RegisterReq struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
 	Password string `json:"password" validate:"required,min=6,max=72"`
-	Role     string `json:"role" validate:"omitempty,oneof=admin user"`
 }
 
 type LoginReq struct {
