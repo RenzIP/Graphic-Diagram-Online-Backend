@@ -44,6 +44,7 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected := api.Group("", middleware.Auth(cfg.JWTSecret))
 
 	protected.Get("/auth/me", h.Auth.Me)
+	protected.Put("/auth/profile", h.Auth.UpdateProfile)
 	protected.Put("/change-password", h.Auth.ChangePassword)
 	protected.Post("/change-password", h.Auth.ChangePassword)
 

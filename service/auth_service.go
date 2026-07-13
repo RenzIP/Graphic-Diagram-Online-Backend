@@ -34,6 +34,44 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uuid.UUID) (*dto.Au
 	return userResponse(user), nil
 }
 
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req dto.UpdateProfileReq) (*dto.AuthMeResp, *pkg.AppError) {
+	if appErr := pkg.Validate(req); appErr != nil {
+		return nil, appErr
+	}
+
+	user, appErr := s.userRepo.FindByID(ctx, userID)
+	if appErr != nil {
+		return nil, appErr
+	}
+	if user == nil {
+		return nil, pkg.ErrNotFound.WithMessage("user not found")
+	}
+
+	if req.Username != nil {
+		newUsername := strings.ToLower(strings.TrimSpace(*req.Username))
+		if newUsername != user.Username {
+			// check for conflict
+			existing, appErr := s.userRepo.FindByUsername(ctx, newUsername)
+			if appErr != nil {
+				return nil, appErr
+			}
+			if existing != nil {
+				return nil, pkg.ErrConflict.WithMessage("username already taken")
+			}
+			user.Username = newUsername
+		}
+	}
+	if req.FullName != nil {
+		user.FullName = req.FullName
+	}
+
+	if _, appErr := s.userRepo.Upsert(ctx, user); appErr != nil {
+		return nil, appErr
+	}
+
+	return userResponse(user), nil
+}
+
 func (s *AuthService) Register(ctx context.Context, req dto.RegisterReq) (*model.UserProfile, *pkg.AppError) {
 	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 

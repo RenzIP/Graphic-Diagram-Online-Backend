@@ -35,3 +35,8 @@ type AuthUserResp struct {
 }
 
 type AuthMeResp = AuthUserResp
+
+type UpdateProfileReq struct {
+	FullName  *string `json:"full_name"`
+	Username  *string `json:"username" validate:"omitempty,min=3,max=50"`
+}

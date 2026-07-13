@@ -92,6 +92,22 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, profile)
 }
 
+func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var req dto.UpdateProfileReq
+	if err := c.BodyParser(&req); err != nil {
+		return handleError(c, pkg.ErrBadRequest.WithMessage("invalid request body"))
+	}
+
+	profile, appErr := h.authSvc.UpdateProfile(c.UserContext(), userID, req)
+	if appErr != nil {
+		return handleError(c, appErr)
+	}
+
+	return pkg.WriteSuccess(c, fiber.StatusOK, profile)
+}
+
 func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 	redirectURI := h.oauthRedirectURI("google")
 	
