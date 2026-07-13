@@ -22,7 +22,22 @@ func NewDocumentHandler(docSvc *service.DocumentService) *DocumentHandler {
 	return &DocumentHandler{docSvc: docSvc}
 }
 
-// ListByProject handles GET /api/projects/:id/documents.
+// ListByProject godoc
+// @Summary      Get all documents by project
+// @Description  Retrieves a paginated list of documents inside a specific project
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Project ID"
+// @Param        page query int false "Page number"
+// @Param        per_page query int false "Items per page"
+// @Param        diagram_type query string false "Filter by diagram type"
+// @Success      200  {object}  dto.DocumentListResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /projects/{id}/documents [get]
 func (h *DocumentHandler) ListByProject(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -44,7 +59,20 @@ func (h *DocumentHandler) ListByProject(c *fiber.Ctx) error {
 	return pkg.WritePaginated(c, resp.Data, resp.Meta.Page, resp.Meta.PerPage, resp.Meta.Total)
 }
 
-// GetByID handles GET /api/documents/:id — full document with content/view.
+// GetByID godoc
+// @Summary      Get document detail
+// @Description  Retrieves the full content and metadata of a specific document by its ID
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Document ID"
+// @Success      200  {object}  dto.DocumentResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/{id} [get]
 func (h *DocumentHandler) GetByID(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 

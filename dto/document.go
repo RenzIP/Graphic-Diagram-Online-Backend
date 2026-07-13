@@ -11,16 +11,16 @@ type CreateDocumentReq struct {
 	ProjectID   *string          `json:"project_id"   validate:"omitempty,uuid"`
 	Title       string           `json:"title"        validate:"omitempty,max=200"`
 	DiagramType string           `json:"diagram_type" validate:"required,oneof=flowchart erd usecase sequence mindmap blank"`
-	Content     *json.RawMessage `json:"content"`
-	View        *json.RawMessage `json:"view"`
+	Content     *json.RawMessage `json:"content" swaggertype:"object"`
+	View        *json.RawMessage `json:"view" swaggertype:"object"`
 }
 
 // UpdateDocumentReq is the body for PUT /api/documents/:id.
 type UpdateDocumentReq struct {
 	Title     *string          `json:"title"      validate:"omitempty,max=200"`
 	ProjectID *string          `json:"project_id"` // nullable — can move or set to null
-	Content   *json.RawMessage `json:"content"`
-	View      *json.RawMessage `json:"view"`
+	Content   *json.RawMessage `json:"content" swaggertype:"object"`
+	View      *json.RawMessage `json:"view" swaggertype:"object"`
 }
 
 // DocumentResp is the full response for a single document (GET /api/documents/:id).
@@ -30,8 +30,8 @@ type DocumentResp struct {
 	WorkspaceID string          `json:"workspace_id"`
 	Title       string          `json:"title"`
 	DiagramType string          `json:"diagram_type"`
-	Content     json.RawMessage `json:"content"`
-	View        json.RawMessage `json:"view"`
+	Content     json.RawMessage `json:"content" swaggertype:"object"`
+	View        json.RawMessage `json:"view" swaggertype:"object"`
 	Version     int             `json:"version"`
 	CreatedBy   *string         `json:"created_by"`
 	CreatedAt   time.Time       `json:"created_at"`
@@ -86,8 +86,8 @@ type ExportDocumentReq struct {
 type DocumentVersionResp struct {
 	ID        string          `json:"id"`
 	Version   int             `json:"version"`
-	Content   json.RawMessage `json:"content"`
-	View      json.RawMessage `json:"view"`
+	Content   json.RawMessage `json:"content" swaggertype:"object"`
+	View      json.RawMessage `json:"view" swaggertype:"object"`
 	CreatedBy *string         `json:"created_by"`
 	CreatedAt time.Time       `json:"created_at"`
 }
