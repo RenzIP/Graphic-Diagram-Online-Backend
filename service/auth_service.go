@@ -160,18 +160,35 @@ func (s *AuthService) UserResponse(user *model.UserProfile) dto.AuthUserResp {
 
 func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email string, fullName, avatarURL *string) (*model.UserProfile, *pkg.AppError) {
 	email = strings.ToLower(strings.TrimSpace(email))
-	username := usernameFromOAuth(email, fullName, userID)
 
-	user := &model.UserProfile{
-		ID:        userID,
-		Username:  username,
-		Email:     optionalString(email),
-		FullName:  fullName,
-		AvatarURL: avatarURL,
-		CreatedAt: time.Now(),
+	// Check if user already exists
+	existing, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
 
-	return s.userRepo.Upsert(ctx, user)
+	var userToUpsert *model.UserProfile
+	if existing == nil {
+		// New user: use oauth generated username and full name
+		username := usernameFromOAuth(email, fullName, userID)
+		userToUpsert = &model.UserProfile{
+			ID:        userID,
+			Username:  username,
+			Email:     optionalString(email),
+			FullName:  fullName,
+			AvatarURL: avatarURL,
+			CreatedAt: time.Now(),
+		}
+	} else {
+		// Existing user: preserve their edited username and full name
+		userToUpsert = existing
+		userToUpsert.Email = optionalString(email)
+		if avatarURL != nil && (userToUpsert.AvatarURL == nil || *userToUpsert.AvatarURL == "") {
+			userToUpsert.AvatarURL = avatarURL
+		}
+	}
+
+	return s.userRepo.Upsert(ctx, userToUpsert)
 }
 
 func userResponse(user *model.UserProfile) *dto.AuthMeResp {
