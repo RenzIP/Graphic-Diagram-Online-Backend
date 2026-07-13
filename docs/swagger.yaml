@@ -1,0 +1,335 @@
+basePath: /api
+definitions:
+  dto.AuthCallbackResp:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/dto.AuthUserResp'
+    type: object
+  dto.AuthUserResp:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.ChangePasswordReq:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        maxLength: 72
+        minLength: 6
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  dto.DocumentListItem:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      diagram_type:
+        type: string
+      id:
+        type: string
+      project_id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+      workspace_id:
+        type: string
+    type: object
+  dto.DocumentListResp:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.DocumentListItem'
+        type: array
+      meta:
+        $ref: '#/definitions/dto.PaginationMeta'
+    type: object
+  dto.DocumentResp:
+    properties:
+      content:
+        type: object
+      created_at:
+        type: string
+      created_by:
+        type: string
+      diagram_type:
+        type: string
+      id:
+        type: string
+      project_id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+      view:
+        type: object
+      workspace_id:
+        type: string
+    type: object
+  dto.LoginReq:
+    properties:
+      identifier:
+        type: string
+      password:
+        type: string
+    required:
+    - identifier
+    - password
+    type: object
+  dto.PaginationMeta:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  dto.RegisterReq:
+    properties:
+      password:
+        maxLength: 72
+        minLength: 6
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  pkg.AppError:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend API for Graphic Diagram Online (GraDiOl)
+  title: GraDiOl API
+  version: "1.0"
+paths:
+  /change-password:
+    post:
+      consumes:
+      - application/json
+      description: Allows an authenticated user to change their password
+      parameters:
+      - description: Password Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ChangePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Change Password
+      tags:
+      - auth
+  /documents/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the full content and metadata of a specific document
+        by its ID
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DocumentResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get document detail
+      tags:
+      - documents
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns an auth token
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuthCallbackResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      summary: Login user
+      tags:
+      - auth
+  /projects/{id}/documents:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a paginated list of documents inside a specific project
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      - description: Filter by diagram type
+        in: query
+        name: diagram_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DocumentListResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get all documents by project
+      tags:
+      - documents
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account and returns an auth token
+      parameters:
+      - description: Registration Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AuthCallbackResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      summary: Register a new user
+      tags:
+      - auth
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

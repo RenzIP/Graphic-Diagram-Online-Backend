@@ -26,6 +26,17 @@ func NewAuthHandler(authSvc *service.AuthService, cfg *config.Config) *AuthHandl
 	return &AuthHandler{authSvc: authSvc, cfg: cfg}
 }
 
+// Register godoc
+// @Summary      Register a new user
+// @Description  Creates a new user account and returns an auth token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body dto.RegisterReq true "Registration Details"
+// @Success      201  {object}  dto.AuthCallbackResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req dto.RegisterReq
 	if err := c.BodyParser(&req); err != nil {
@@ -45,6 +56,18 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusCreated, resp)
 }
 
+// Login godoc
+// @Summary      Login user
+// @Description  Authenticates a user and returns an auth token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body dto.LoginReq true "Login Credentials"
+// @Success      200  {object}  dto.AuthCallbackResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req dto.LoginReq
 	if err := c.BodyParser(&req); err != nil {
@@ -64,6 +87,19 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
+// ChangePassword godoc
+// @Summary      Change Password
+// @Description  Allows an authenticated user to change their password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body dto.ChangePasswordReq true "Password Data"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /change-password [post]
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 

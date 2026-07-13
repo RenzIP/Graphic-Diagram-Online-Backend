@@ -4,9 +4,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/RenzIP/Graphic-Diagram-Online/config"
+	_ "github.com/RenzIP/Graphic-Diagram-Online/docs"
 	"github.com/RenzIP/Graphic-Diagram-Online/handler"
 	"github.com/RenzIP/Graphic-Diagram-Online/middleware"
 	"github.com/RenzIP/Graphic-Diagram-Online/ws"
+	"github.com/gofiber/swagger"
 )
 
 type Handlers struct {
@@ -26,6 +28,9 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	app.Use(middleware.CORS(cfg.FrontendURL))
 
 	api := app.Group("/api")
+
+	// Swagger documentation endpoint
+	app.Get("/docs/*", swagger.HandlerDefault)
 
 	app.Post("/register", h.Auth.Register)
 	app.Post("/login", h.Auth.Login)

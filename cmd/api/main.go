@@ -1,3 +1,12 @@
+// @title GraDiOl API
+// @version 1.0
+// @description Backend API for Graphic Diagram Online (GraDiOl)
+// @host localhost:8080
+// @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 package main
 
 import (
