@@ -15,6 +15,7 @@ type Handlers struct {
 	Workspace *handler.WorkspaceHandler
 	Project   *handler.ProjectHandler
 	Document  *handler.DocumentHandler
+	Admin     *handler.AdminHandler
 	Hub       *ws.Hub            // WebSocket collaboration hub
 	Validator *ws.JWTValidator   // JWT validator for WebSocket auth
 }
@@ -48,7 +49,15 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected.Put("/change-password", h.Auth.ChangePassword)
 	protected.Post("/change-password", h.Auth.ChangePassword)
 
-	// adminOnly := middleware.RequireRole("admin")
+	adminOnly := protected.Group("/admin", middleware.RequireRole("admin"))
+	adminOnly.Get("/overview", h.Admin.GetOverview)
+	adminOnly.Get("/users", h.Admin.ListUsers)
+	adminOnly.Put("/users/:id/role", h.Admin.UpdateUserRole)
+	adminOnly.Delete("/users/:id", h.Admin.DeleteUser)
+	adminOnly.Get("/workspaces", h.Admin.ListWorkspaces)
+	adminOnly.Delete("/workspaces/:id", h.Admin.DeleteWorkspace)
+	adminOnly.Get("/documents", h.Admin.ListDocuments)
+	adminOnly.Delete("/documents/:id", h.Admin.DeleteDocument)
 
 	protected.Get("/workspaces", h.Workspace.List)
 	protected.Post("/workspaces", h.Workspace.Create)

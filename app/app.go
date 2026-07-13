@@ -99,6 +99,7 @@ func New() (*Instance, error) {
 		Workspace: handler.NewWorkspaceHandler(wsSvc),
 		Project:   handler.NewProjectHandler(projSvc),
 		Document:  handler.NewDocumentHandler(docSvc),
+		Admin:     handler.NewAdminHandler(database),
 		Hub:       hub,
 		Validator: validator,
 	}
