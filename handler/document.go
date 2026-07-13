@@ -89,7 +89,20 @@ func (h *DocumentHandler) GetByID(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
-// Create handles POST /api/documents — create a new document.
+// Create godoc
+// @Summary      Create a new document
+// @Description  Creates a new document in a workspace/project
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body dto.CreateDocumentReq true "Document Details"
+// @Success      201  {object}  dto.DocumentResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents [post]
 func (h *DocumentHandler) Create(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -106,7 +119,22 @@ func (h *DocumentHandler) Create(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusCreated, resp)
 }
 
-// Update handles PUT /api/documents/:id — update document.
+// Update godoc
+// @Summary      Update a document
+// @Description  Updates a document's content and metadata
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Document ID"
+// @Param        request body dto.UpdateDocumentReq true "Document Details"
+// @Success      200  {object}  dto.DocumentResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/{id} [put]
 func (h *DocumentHandler) Update(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -128,7 +156,21 @@ func (h *DocumentHandler) Update(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
-// Delete handles DELETE /api/documents/:id — delete document.
+// Delete godoc
+// @Summary      Delete a document
+// @Description  Deletes a document by ID
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Document ID"
+// @Success      204  "No Content"
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/{id} [delete]
 func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -144,7 +186,18 @@ func (h *DocumentHandler) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// Recent handles GET /api/documents/recent — recently updated documents dashboard widget.
+// Recent godoc
+// @Summary      Get recent documents
+// @Description  Retrieves the user's recently accessed/updated documents
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit query int false "Number of documents to retrieve"
+// @Success      200  {array}   model.Document
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/recent [get]
 func (h *DocumentHandler) Recent(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -161,7 +214,21 @@ func (h *DocumentHandler) Recent(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
-// ListVersions handles GET /api/documents/:id/versions.
+// ListVersions godoc
+// @Summary      Get document versions
+// @Description  Retrieves the history of saved versions for a document
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Document ID"
+// @Success      200  {array}   model.DocumentVersion
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/{id}/versions [get]
 func (h *DocumentHandler) ListVersions(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -178,7 +245,22 @@ func (h *DocumentHandler) ListVersions(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
-// RestoreVersion handles POST /api/documents/:id/versions/:version/restore.
+// RestoreVersion godoc
+// @Summary      Restore document version
+// @Description  Restores a document to a specific previous version
+// @Tags         documents
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Document ID"
+// @Param        version path int true "Version number"
+// @Success      200  {object}  dto.DocumentResp
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /documents/{id}/versions/{version}/restore [post]
 func (h *DocumentHandler) RestoreVersion(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 

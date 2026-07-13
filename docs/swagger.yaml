@@ -34,6 +34,59 @@ definitions:
     - current_password
     - new_password
     type: object
+  dto.CreateDocumentReq:
+    properties:
+      content:
+        type: object
+      diagram_type:
+        enum:
+        - flowchart
+        - erd
+        - usecase
+        - sequence
+        - mindmap
+        - blank
+        type: string
+      project_id:
+        type: string
+      title:
+        maxLength: 200
+        type: string
+      view:
+        type: object
+      workspace_id:
+        type: string
+    required:
+    - diagram_type
+    - workspace_id
+    type: object
+  dto.CreateProjectReq:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      workspace_id:
+        type: string
+    required:
+    - name
+    - workspace_id
+    type: object
+  dto.CreateWorkspaceReq:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
   dto.DocumentListItem:
     properties:
       created_at:
@@ -124,6 +177,106 @@ definitions:
     - password
     - username
     type: object
+  dto.UpdateDocumentReq:
+    properties:
+      content:
+        type: object
+      project_id:
+        description: nullable — can move or set to null
+        type: string
+      title:
+        maxLength: 200
+        type: string
+      view:
+        type: object
+    type: object
+  dto.UpdateProjectReq:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    type: object
+  dto.UpdateWorkspaceReq:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    type: object
+  model.Document:
+    properties:
+      content:
+        items:
+          type: integer
+        type: array
+      created_at:
+        type: string
+      created_by:
+        type: string
+      diagram_type:
+        type: string
+      id:
+        type: string
+      project_id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+      view:
+        items:
+          type: integer
+        type: array
+      workspace_id:
+        type: string
+    type: object
+  model.DocumentVersion:
+    properties:
+      content:
+        items:
+          type: integer
+        type: array
+      created_at:
+        type: string
+      created_by:
+        type: string
+      document_id:
+        type: string
+      id:
+        type: string
+      version:
+        type: integer
+      view:
+        items:
+          type: integer
+        type: array
+    type: object
+  model.Project:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      workspace_id:
+        type: string
+    type: object
   model.UserProfile:
     properties:
       avatar_url:
@@ -139,6 +292,23 @@ definitions:
       role:
         type: string
       username:
+        type: string
+    type: object
+  model.Workspace:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      slug:
+        type: string
+      updated_at:
         type: string
     type: object
   pkg.AppError:
@@ -499,7 +669,87 @@ paths:
       summary: Change Password
       tags:
       - auth
+  /documents:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new document in a workspace/project
+      parameters:
+      - description: Document Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateDocumentReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.DocumentResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Create a new document
+      tags:
+      - documents
   /documents/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a document by ID
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete a document
+      tags:
+      - documents
     get:
       consumes:
       - application/json
@@ -539,6 +789,179 @@ paths:
       summary: Get document detail
       tags:
       - documents
+    put:
+      consumes:
+      - application/json
+      description: Updates a document's content and metadata
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Document Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateDocumentReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DocumentResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Update a document
+      tags:
+      - documents
+  /documents/{id}/versions:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the history of saved versions for a document
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.DocumentVersion'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get document versions
+      tags:
+      - documents
+  /documents/{id}/versions/{version}/restore:
+    post:
+      consumes:
+      - application/json
+      description: Restores a document to a specific previous version
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DocumentResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Restore document version
+      tags:
+      - documents
+  /documents/recent:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the user's recently accessed/updated documents
+      parameters:
+      - description: Number of documents to retrieve
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Document'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get recent documents
+      tags:
+      - documents
   /login:
     post:
       consumes:
@@ -573,6 +996,135 @@ paths:
       summary: Login user
       tags:
       - auth
+  /projects:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new project in a workspace
+      parameters:
+      - description: Project Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateProjectReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Project'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Create a new project
+      tags:
+      - projects
+  /projects/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a project and its documents
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete a project
+      tags:
+      - projects
+    put:
+      consumes:
+      - application/json
+      description: Updates a project's details
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateProjectReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Project'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Update a project
+      tags:
+      - projects
   /projects/{id}/documents:
     get:
       consumes:
@@ -650,6 +1202,209 @@ paths:
       summary: Register a new user
       tags:
       - auth
+  /workspaces:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all workspaces the current user is a member of
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get list of workspaces
+      tags:
+      - workspaces
+    post:
+      consumes:
+      - application/json
+      description: Creates a new workspace and sets the current user as owner
+      parameters:
+      - description: Workspace Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWorkspaceReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Workspace'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Create a new workspace
+      tags:
+      - workspaces
+  /workspaces/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a workspace and all its contents (must be owner)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete a workspace
+      tags:
+      - workspaces
+    put:
+      consumes:
+      - application/json
+      description: Updates workspace details (must be owner or editor)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateWorkspaceReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Workspace'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Update a workspace
+      tags:
+      - workspaces
+  /workspaces/{id}/projects:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all projects for a given workspace ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get list of projects in a workspace
+      tags:
+      - projects
 securityDefinitions:
   BearerAuth:
     in: header

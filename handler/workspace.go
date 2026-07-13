@@ -20,7 +20,19 @@ func NewWorkspaceHandler(wsSvc *service.WorkspaceService) *WorkspaceHandler {
 	return &WorkspaceHandler{wsSvc: wsSvc}
 }
 
-// List handles GET /api/workspaces — list workspaces the user belongs to.
+// List godoc
+// @Summary      Get list of workspaces
+// @Description  Retrieves all workspaces the current user is a member of
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page    query     int  false  "Page number"
+// @Param        per_page  query     int  false  "Items per page"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /workspaces [get]
 func (h *WorkspaceHandler) List(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	pq := dto.ParsePagination(c.Query("page"), c.Query("per_page"))
@@ -33,7 +45,19 @@ func (h *WorkspaceHandler) List(c *fiber.Ctx) error {
 	return pkg.WritePaginated(c, resp.Data, resp.Meta.Page, resp.Meta.PerPage, resp.Meta.Total)
 }
 
-// Create handles POST /api/workspaces — create a new workspace.
+// Create godoc
+// @Summary      Create a new workspace
+// @Description  Creates a new workspace and sets the current user as owner
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body dto.CreateWorkspaceReq true "Workspace Details"
+// @Success      201  {object}  model.Workspace
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /workspaces [post]
 func (h *WorkspaceHandler) Create(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -50,7 +74,22 @@ func (h *WorkspaceHandler) Create(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusCreated, resp)
 }
 
-// Update handles PUT /api/workspaces/:id — update workspace.
+// Update godoc
+// @Summary      Update a workspace
+// @Description  Updates workspace details (must be owner or editor)
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Workspace ID"
+// @Param        request body dto.UpdateWorkspaceReq true "Update Details"
+// @Success      200  {object}  model.Workspace
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /workspaces/{id} [put]
 func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -72,7 +111,21 @@ func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, resp)
 }
 
-// Delete handles DELETE /api/workspaces/:id — delete workspace.
+// Delete godoc
+// @Summary      Delete a workspace
+// @Description  Deletes a workspace and all its contents (must be owner)
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Workspace ID"
+// @Success      204  "No Content"
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /workspaces/{id} [delete]
 func (h *WorkspaceHandler) Delete(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
