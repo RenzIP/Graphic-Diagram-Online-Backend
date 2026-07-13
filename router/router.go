@@ -31,7 +31,9 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	api := app.Group("/api")
 
 	// Swagger documentation endpoint
-	app.Get("/docs/*", swagger.HandlerDefault)
+	app.Get("/docs/*", swagger.New(swagger.Config{
+		URL: "doc.json", // Relative URL so it resolves correctly behind proxy/GCF path prefixes
+	}))
 
 	app.Post("/register", h.Auth.Register)
 	app.Post("/login", h.Auth.Login)

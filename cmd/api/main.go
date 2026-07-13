@@ -1,8 +1,8 @@
 // @title GraDiOl API
 // @version 1.0
 // @description Backend API for Graphic Diagram Online (GraDiOl)
-// @host localhost:8080
-// @BasePath /api
+// @host asia-southeast1-renzip-478811.cloudfunctions.net
+// @BasePath /gradiol-api/api
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization

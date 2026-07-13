@@ -20,7 +20,18 @@ func NewAdminHandler(db *gorm.DB) *AdminHandler {
 	return &AdminHandler{db: db}
 }
 
-// GetOverview returns system-wide usage counts
+// GetOverview godoc
+// @Summary      Get system overview metrics
+// @Description  Returns system-wide counts of users, workspaces, projects, and documents
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]int64
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/overview [get]
 func (h *AdminHandler) GetOverview(c *fiber.Ctx) error {
 	var userCount int64
 	var wsCount int64
@@ -48,7 +59,18 @@ func (h *AdminHandler) GetOverview(c *fiber.Ctx) error {
 	})
 }
 
-// ListUsers lists all user profiles in the system
+// ListUsers godoc
+// @Summary      List all users
+// @Description  Lists all user profiles registered in the system
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   model.UserProfile
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/users [get]
 func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 	var users []model.UserProfile
 	if err := h.db.WithContext(c.UserContext()).Order("created_at desc").Find(&users).Error; err != nil {
@@ -58,7 +80,22 @@ func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, users)
 }
 
-// UpdateUserRole updates role of a user
+// UpdateUserRole godoc
+// @Summary      Update user role
+// @Description  Updates a specific user's role to 'admin' or 'user'
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "User ID"
+// @Param        role body      map[string]string true "Target Role (e.g. {"role": "admin"})"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      404  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/users/{id}/role [put]
 func (h *AdminHandler) UpdateUserRole(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	userID, err := uuid.Parse(idStr)
@@ -90,7 +127,20 @@ func (h *AdminHandler) UpdateUserRole(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, fiber.Map{"message": "User role updated successfully"})
 }
 
-// DeleteUser deletes a user from the system
+// DeleteUser godoc
+// @Summary      Delete user
+// @Description  Deletes a user and cleans up their workspace memberships from the platform
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "User ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/users/{id} [delete]
 func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	userID, err := uuid.Parse(idStr)
@@ -123,7 +173,18 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, fiber.Map{"message": "User deleted successfully"})
 }
 
-// ListWorkspaces lists all workspaces
+// ListWorkspaces godoc
+// @Summary      List all workspaces
+// @Description  Lists all workspaces in the system along with their owner details
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   map[string]interface{}
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/workspaces [get]
 func (h *AdminHandler) ListWorkspaces(c *fiber.Ctx) error {
 	type WorkspaceDetail struct {
 		model.Workspace
@@ -146,7 +207,20 @@ func (h *AdminHandler) ListWorkspaces(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, results)
 }
 
-// DeleteWorkspace deletes a workspace and all its child projects/documents
+// DeleteWorkspace godoc
+// @Summary      Delete workspace
+// @Description  Deletes a workspace along with all its child projects and documents
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Workspace ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/workspaces/{id} [delete]
 func (h *AdminHandler) DeleteWorkspace(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	wsID, err := uuid.Parse(idStr)
@@ -186,7 +260,18 @@ func (h *AdminHandler) DeleteWorkspace(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, fiber.Map{"message": "Workspace and all its assets deleted successfully"})
 }
 
-// ListDocuments lists all diagrams in the system
+// ListDocuments godoc
+// @Summary      List all diagrams
+// @Description  Lists all diagrams in the system along with workspace and project names
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   map[string]interface{}
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/documents [get]
 func (h *AdminHandler) ListDocuments(c *fiber.Ctx) error {
 	type DocDetail struct {
 		model.Document
@@ -212,7 +297,20 @@ func (h *AdminHandler) ListDocuments(c *fiber.Ctx) error {
 	return pkg.WriteSuccess(c, fiber.StatusOK, results)
 }
 
-// DeleteDocument deletes a document
+// DeleteDocument godoc
+// @Summary      Delete diagram
+// @Description  Deletes a diagram and all its historical versions
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Document ID"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  pkg.AppError
+// @Failure      401  {object}  pkg.AppError
+// @Failure      403  {object}  pkg.AppError
+// @Failure      500  {object}  pkg.AppError
+// @Router       /admin/documents/{id} [delete]
 func (h *AdminHandler) DeleteDocument(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	docID, err := uuid.Parse(idStr)

@@ -1,4 +1,4 @@
-basePath: /api
+basePath: /gradiol-api/api
 definitions:
   dto.AuthCallbackResp:
     properties:
@@ -124,6 +124,23 @@ definitions:
     - password
     - username
     type: object
+  model.UserProfile:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
   pkg.AppError:
     properties:
       code:
@@ -132,13 +149,319 @@ definitions:
       message:
         type: string
     type: object
-host: localhost:8080
+host: asia-southeast1-renzip-478811.cloudfunctions.net
 info:
   contact: {}
   description: Backend API for Graphic Diagram Online (GraDiOl)
   title: GraDiOl API
   version: "1.0"
 paths:
+  /admin/documents:
+    get:
+      consumes:
+      - application/json
+      description: Lists all diagrams in the system along with workspace and project
+        names
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: List all diagrams
+      tags:
+      - admin
+  /admin/documents/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a diagram and all its historical versions
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete diagram
+      tags:
+      - admin
+  /admin/overview:
+    get:
+      consumes:
+      - application/json
+      description: Returns system-wide counts of users, workspaces, projects, and
+        documents
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get system overview metrics
+      tags:
+      - admin
+  /admin/users:
+    get:
+      consumes:
+      - application/json
+      description: Lists all user profiles registered in the system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.UserProfile'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: List all users
+      tags:
+      - admin
+  /admin/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a user and cleans up their workspace memberships from the
+        platform
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete user
+      tags:
+      - admin
+  /admin/users/{id}/role:
+    put:
+      consumes:
+      - application/json
+      description: Updates a specific user's role to 'admin' or 'user'
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target Role (e.g. {
+        in: body
+        name: role
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Update user role
+      tags:
+      - admin
+  /admin/workspaces:
+    get:
+      consumes:
+      - application/json
+      description: Lists all workspaces in the system along with their owner details
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: List all workspaces
+      tags:
+      - admin
+  /admin/workspaces/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a workspace along with all its child projects and documents
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete workspace
+      tags:
+      - admin
   /change-password:
     post:
       consumes:
