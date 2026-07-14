@@ -283,9 +283,15 @@ func (h *AuthHandler) completeOAuth(c *fiber.Ctx, providerUserID, email, fullNam
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=profile_failed", fiber.StatusTemporaryRedirect)
 	}
 
-	// Use role from database, not hardcoded "user"
-	username := usernameForToken(email, fullName, userID)
-	token, err := h.signJWT(userID, username, user.Role)
+	// Use role and username from database! Also MUST use user.ID in case it was linked to an existing account!
+	var username string
+	if user.Username != nil {
+		username = *user.Username
+	} else {
+		username = usernameForToken(email, fullName, user.ID)
+	}
+
+	token, err := h.signJWT(user.ID, username, user.Role)
 	if err != nil {
 		return c.Redirect(h.cfg.FrontendURL+"/login?error=token_failed", fiber.StatusTemporaryRedirect)
 	}

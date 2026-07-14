@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/RenzIP/Graphic-Diagram-Online/config"
 	"github.com/RenzIP/Graphic-Diagram-Online/db"
-	"github.com/RenzIP/Graphic-Diagram-Online/dto"
 	"github.com/RenzIP/Graphic-Diagram-Online/model"
 )
 
@@ -23,28 +21,24 @@ func main() {
 	}
 	defer db.Disconnect(database)
 
-	var u model.UserProfile
-	if err := database.First(&u, "email = ?", "nurfadilahmfauzi@gmail.com").Error; err != nil {
-		fmt.Printf("User not found: %v\n", err)
-		return
+	var users []model.UserProfile
+	if err := database.Find(&users).Error; err != nil {
+		fmt.Printf("Failed to find users: %v\n", err)
+	} else {
+		for _, u := range users {
+			email := "<nil>"
+			if u.Email != nil {
+				email = *u.Email
+			}
+			username := "<nil>"
+			if u.Username != nil {
+				username = *u.Username
+			}
+            name := "<nil>"
+            if u.Name != nil {
+                name = *u.Name
+            }
+			fmt.Printf("User: ID=%s Provider=%s Email=%s Username=%s Name=%s\n", u.ID, u.Provider, email, username, name)
+		}
 	}
-
-	// Just print the response object!
-	resp := &dto.AuthMeResp{
-		ID:        u.ID.String(),
-		Name:      u.Name,
-		Username:  u.Username,
-		Email:     u.Email,
-		Role:      u.Role,
-		Provider:  u.Provider,
-		Avatar:    u.Avatar,
-		Status:    u.Status,
-		FullName:  u.FullName,
-		AvatarURL: u.AvatarURL,
-	}
-
-	b, _ := json.MarshalIndent(resp, "", "  ")
-	fmt.Println("API Response JSON:")
-	fmt.Println(string(b))
-
 }
