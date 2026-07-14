@@ -49,7 +49,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req d
 
 	if req.Username != nil {
 		newUsername := strings.ToLower(strings.TrimSpace(*req.Username))
-		if newUsername != user.Username {
+		if user.Username == nil || newUsername != *user.Username {
 			// check for conflict
 			existing, appErr := s.userRepo.FindByUsername(ctx, newUsername)
 			if appErr != nil {
@@ -58,7 +58,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req d
 			if existing != nil {
 				return nil, pkg.ErrConflict.WithMessage("username already taken")
 			}
-			user.Username = newUsername
+			user.Username = &newUsername
 		}
 	}
 	if req.FullName != nil {
@@ -79,12 +79,20 @@ func (s *AuthService) Register(ctx context.Context, req dto.RegisterReq) (*model
 		return nil, appErr
 	}
 
-	existingUser, appErr := s.userRepo.FindByUsername(ctx, req.Username)
+	existingUser, appErr := s.userRepo.FindByUsernameOrEmail(ctx, req.Username)
 	if appErr != nil {
 		return nil, appErr
 	}
 	if existingUser != nil {
-		return nil, pkg.ErrConflict.WithMessage("username already registered")
+		return nil, pkg.ErrConflict.WithMessage("username or email already registered")
+	}
+	
+	existingEmail, appErr := s.userRepo.FindByEmail(ctx, req.Email)
+	if appErr != nil {
+		return nil, appErr
+	}
+	if existingEmail != nil {
+		return nil, pkg.ErrConflict.WithMessage("username or email already registered")
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -95,10 +103,15 @@ func (s *AuthService) Register(ctx context.Context, req dto.RegisterReq) (*model
 	hash := string(passwordHash)
 	user := &model.UserProfile{
 		ID:        uuid.New(),
-		Username:  req.Username,
+		Name:      &req.Name,
+		Username:  &req.Username,
+		Email:     &req.Email,
 		Password:  &hash,
+		Provider:  "local",
 		Role:      "user", // Always force to "user" - never accept from client
+		Status:    "active",
 		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	if appErr := s.userRepo.Create(ctx, user); appErr != nil {
 		return nil, appErr
@@ -117,7 +130,10 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginReq) (*model.UserP
 	if appErr != nil {
 		return nil, appErr
 	}
-	if user == nil || user.Password == nil || *user.Password == "" {
+	if user == nil {
+		return nil, pkg.ErrNotFound.WithMessage("account_not_found")
+	}
+	if user.Password == nil || *user.Password == "" {
 		return nil, pkg.ErrUnauthorized.WithMessage("invalid username/email or password")
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(req.Password)); err != nil {
@@ -161,10 +177,21 @@ func (s *AuthService) UserResponse(user *model.UserProfile) dto.AuthUserResp {
 func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email string, fullName, avatarURL *string) (*model.UserProfile, *pkg.AppError) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	// Check if user already exists
-	existing, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return nil, err
+	var existing *model.UserProfile
+	var err *pkg.AppError
+
+	if email != "" {
+		existing, err = s.userRepo.FindByEmail(ctx, email)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if existing == nil {
+		existing, err = s.userRepo.FindByID(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var userToUpsert *model.UserProfile
@@ -173,18 +200,42 @@ func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email
 		username := usernameFromOAuth(email, fullName, userID)
 		userToUpsert = &model.UserProfile{
 			ID:        userID,
-			Username:  username,
+			Name:      fullName,
+			Username:  &username,
 			Email:     optionalString(email),
 			FullName:  fullName,
+			Avatar:    avatarURL,
 			AvatarURL: avatarURL,
+			Provider:  "oauth",
+			Role:      "user",
+			Status:    "active",
 			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 	} else {
 		// Existing user: preserve their edited username and full name
 		userToUpsert = existing
-		userToUpsert.Email = optionalString(email)
+		
+		// ALWAYS sync email if it was missing
+		if email != "" && (userToUpsert.Email == nil || *userToUpsert.Email == "") {
+			userToUpsert.Email = &email
+		}
+		// ALWAYS sync FullName/Name if it was missing
+		if fullName != nil && *fullName != "" {
+			if userToUpsert.FullName == nil || *userToUpsert.FullName == "" {
+				userToUpsert.FullName = fullName
+			}
+			if userToUpsert.Name == nil || *userToUpsert.Name == "" {
+				userToUpsert.Name = fullName
+			}
+		}
+
 		if avatarURL != nil && (userToUpsert.AvatarURL == nil || *userToUpsert.AvatarURL == "") {
 			userToUpsert.AvatarURL = avatarURL
+			userToUpsert.Avatar = avatarURL
+		}
+		if userToUpsert.Provider == "local" {
+			userToUpsert.Provider = "oauth_linked"
 		}
 	}
 
@@ -194,9 +245,13 @@ func (s *AuthService) UpsertProfile(ctx context.Context, userID uuid.UUID, email
 func userResponse(user *model.UserProfile) *dto.AuthMeResp {
 	return &dto.AuthMeResp{
 		ID:        user.ID.String(),
+		Name:      user.Name,
 		Username:  user.Username,
-		Role:      user.Role,
 		Email:     user.Email,
+		Role:      user.Role,
+		Provider:  user.Provider,
+		Avatar:    user.Avatar,
+		Status:    user.Status,
 		FullName:  user.FullName,
 		AvatarURL: user.AvatarURL,
 	}

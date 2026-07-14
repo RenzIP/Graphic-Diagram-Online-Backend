@@ -53,9 +53,10 @@ func main() {
 		if i == 1 {
 			role = "admin"
 		}
+		username := fmt.Sprintf("dummy%d", i)
 		user := model.UserProfile{
 			ID:        uuid.New(),
-			Username:  fmt.Sprintf("dummy%d", i),
+			Username:  &username,
 			Password:  hashPassword("password123"),
 			Role:      role,
 			Email:     &email,

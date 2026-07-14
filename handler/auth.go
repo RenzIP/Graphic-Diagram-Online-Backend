@@ -295,7 +295,11 @@ func (h *AuthHandler) completeOAuth(c *fiber.Ctx, providerUserID, email, fullNam
 }
 
 func (h *AuthHandler) buildAuthSession(user *model.UserProfile) (*dto.AuthCallbackResp, error) {
-	token, err := h.signJWT(user.ID, user.Username, user.Role)
+	var username string
+	if user.Username != nil {
+		username = *user.Username
+	}
+	token, err := h.signJWT(user.ID, username, user.Role)
 	if err != nil {
 		return nil, err
 	}

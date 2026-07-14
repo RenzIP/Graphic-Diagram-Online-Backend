@@ -81,7 +81,7 @@ func (r *UserRepo) Create(ctx context.Context, user *model.UserProfile) *pkg.App
 		if isDuplicateError(err) {
 			return pkg.ErrConflict.WithMessage("username already registered")
 		}
-		return pkg.ErrInternal.WithMessage("failed to create user")
+		return pkg.ErrInternal.WithMessage("failed to create user: " + err.Error())
 	}
 
 	return nil
@@ -125,7 +125,9 @@ func (r *UserRepo) Upsert(ctx context.Context, user *model.UserProfile) (*model.
 	existing.Username = user.Username
 	existing.Email = user.Email
 	existing.FullName = user.FullName
+	existing.Name = user.Name
 	existing.AvatarURL = user.AvatarURL
+	existing.Avatar = user.Avatar
 	// Do NOT update Role - preserve existing role from DB
 
 	if err := r.db.WithContext(ctx).Save(existing).Error; err != nil {
