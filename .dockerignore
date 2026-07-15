@@ -1,0 +1,8 @@
+bin/
+*.md
+docs/
+.git/
+.github/
+.env
+.env.*
+gcf/

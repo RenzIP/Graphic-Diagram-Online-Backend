@@ -1,0 +1,87 @@
+# Cloud Run service spec for the GraDiOl WebSocket-only backend (cmd/ws).
+#
+# Deploy with:
+#   gcloud run services replace cloudrun.ws.yaml --region asia-southeast1
+#
+# This deploys ONLY the realtime WebSocket service. The REST API stays on
+# Cloud Functions — this service exists solely for long-lived /ws connections,
+# which Cloud Functions cannot serve.
+#
+# Prerequisites:
+#   1. Build & push the image first:
+#        gcloud builds submit --tag gcr.io/renzip-478811/gradiol-ws
+#   2. Create secrets in Secret Manager (once), so they never live in this file:
+#        printf '%s' 'YOUR_JWT_SECRET'  | gcloud secrets create gradiol-jwt-secret   --data-file=-
+#        printf '%s' 'YOUR_DB_URL'      | gcloud secrets create gradiol-database-url --data-file=-
+#      Update an existing secret with:
+#        printf '%s' 'NEW_VALUE' | gcloud secrets versions add gradiol-jwt-secret --data-file=-
+#   3. Grant the Cloud Run runtime service account access to the secrets:
+#        gcloud secrets add-iam-policy-binding gradiol-jwt-secret \
+#          --member="serviceAccount:$(gcloud projects describe renzip-478811 --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
+#          --role=roles/secretmanager.secretAccessor
+#        (repeat for gradiol-database-url)
+#
+# IMPORTANT: JWT_SECRET must be byte-for-byte identical to the value used by the
+# Cloud Functions REST backend — tokens are issued there and verified here.
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: gradiol-ws
+  labels:
+    cloud.googleapis.com/location: asia-southeast1
+  annotations:
+    # Allow unauthenticated access — the app does its own JWT + membership auth.
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # --- Single instance: the WS hub broadcasts in-memory per instance. ---
+        # Two instances = two users in the same room can't see each other.
+        # Scaling past 1 requires a Redis pub/sub relay (not implemented).
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        # Keep the CPU on even between requests so the heartbeat/presence
+        # goroutines and idle WebSocket connections aren't throttled.
+        run.googleapis.com/cpu-throttling: "false"
+        # Optional: pin to second-gen execution environment (better networking).
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      # One instance must hold many simultaneous WebSocket connections.
+      # Default is 80; raise it so a busy document doesn't spill (and can't
+      # spill, since maxScale is 1).
+      containerConcurrency: 1000
+      # Cloud Run's max request timeout. A WebSocket is one long-lived request,
+      # so this caps how long a single connection can stay open (~1 hour). The
+      # frontend auto-reconnects, so clients recover transparently.
+      timeoutSeconds: 3600
+      containers:
+        - image: gcr.io/renzip-478811/gradiol-ws
+          ports:
+            # Must be the port cmd/ws listens on. Cloud Run also injects PORT;
+            # config.Load() reads it and defaults to 8080, so they match.
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: ENV
+              value: production
+            - name: FRONTEND_URL
+              value: https://graphic-diagram-online-frontend.vercel.app
+            # REDIS_URL is optional. Uncomment to back locks/presence with Redis.
+            # - name: REDIS_URL
+            #   value: redis://...
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gradiol-jwt-secret
+                  key: latest
+            - name: SUPABASE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gradiol-database-url
+                  key: latest

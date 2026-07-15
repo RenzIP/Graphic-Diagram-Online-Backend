@@ -1,0 +1,115 @@
+# Deploy GraDiOl WebSocket service to Google Cloud Run
+#
+# The REST API stays on Cloud Functions (see deploy-gcf.yml). This workflow
+# deploys ONLY the realtime WebSocket service (cmd/ws) to Cloud Run, which —
+# unlike Cloud Functions — can hold long-lived WebSocket connections.
+#
+# Reuses the SAME GitHub Secrets as the GCF workflow:
+#   GCP_SA_KEY               – Service Account JSON key
+#   GCP_PROJECT_ID           – GCP project ID
+#   JWT_SECRET               – MUST be byte-for-byte identical to the GCF value
+#                              (tokens are issued by REST on GCF, verified here)
+#   SUPABASE_DATABASE_URL    – PostgreSQL connection string (WS auth checks membership)
+#   FRONTEND_URL             – frontend origin, e.g. https://gradiol.vercel.app
+#   REDIS_URL                – Redis connection string (optional)
+#
+# Variables (Settings → Secrets and variables → Variables):
+#   CLOUDRUN_WS_SERVICE      – Cloud Run service name (default: gradiol-ws)
+#   CLOUDRUN_WS_REGION       – region (default: asia-southeast1)
+#
+# The SA needs: Cloud Run Admin, Cloud Build Editor, Artifact Registry Writer,
+# Service Account User, Storage Admin.
+#
+# After the first deploy, set NEXT_PUBLIC_WS_URL in Vercel to:
+#   wss://<the URL this workflow prints>/ws
+#
+# IMPORTANT — single instance only. The WS hub broadcasts in-memory per
+# instance, so two instances = users in the same room can't see each other.
+# Scaling past 1 requires a Redis pub/sub relay (not implemented).
+
+name: Deploy WebSocket to Cloud Run
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "Dockerfile"
+      - ".github/workflows/deploy-cloudrun-ws.yml"
+  workflow_dispatch: # allow manual trigger
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  deploy:
+    name: Build & Deploy WS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SERVICE_NAME: ${{ vars.CLOUDRUN_WS_SERVICE || 'gradiol-ws' }}
+      REGION: ${{ vars.CLOUDRUN_WS_REGION || 'asia-southeast1' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Verify build
+        run: go build ./cmd/ws
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build & push image (Cloud Build)
+        run: |
+          IMAGE="gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          gcloud builds submit --tag "$IMAGE" .
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            --image="${{ env.IMAGE }}" \
+            --region="${{ env.REGION }}" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=8080 \
+            --min-instances=1 \
+            --max-instances=1 \
+            --concurrency=1000 \
+            --cpu=1 \
+            --memory=512Mi \
+            --timeout=3600 \
+            --no-cpu-throttling \
+            --execution-environment=gen2 \
+            --set-env-vars="\
+          ENV=production,\
+          LOG_LEVEL=info,\
+          LOG_FORMAT=text,\
+          JWT_SECRET=${{ secrets.JWT_SECRET }},\
+          SUPABASE_DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }},\
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }},\
+          REDIS_URL=${{ secrets.REDIS_URL }}"
+
+      - name: Show deployed URL
+        run: |
+          URL=$(gcloud run services describe "${{ env.SERVICE_NAME }}" \
+            --region="${{ env.REGION }}" \
+            --format="value(status.url)")
+          echo "🔌 WS deployed to: $URL"
+          echo "   Set NEXT_PUBLIC_WS_URL in Vercel to: wss://${URL#https://}/ws"
