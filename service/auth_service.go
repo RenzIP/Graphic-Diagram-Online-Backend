@@ -61,6 +61,9 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, req d
 			user.Username = &newUsername
 		}
 	}
+	if req.Name != nil {
+		user.Name = req.Name
+	}
 	if req.FullName != nil {
 		user.FullName = req.FullName
 	}
