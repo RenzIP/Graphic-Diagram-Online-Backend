@@ -18,8 +18,9 @@ type JWTValidator struct {
 	Secret string
 }
 
-// ValidateToken parses and validates a JWT token, returning the user ID and role
-func (v *JWTValidator) ValidateToken(tokenStr string) (userID uuid.UUID, role string, err error) {
+// ValidateToken parses and validates a JWT token, returning the user ID, role,
+// and username (from the "username" claim; empty if absent).
+func (v *JWTValidator) ValidateToken(tokenStr string) (userID uuid.UUID, role, username string, err error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -28,37 +29,43 @@ func (v *JWTValidator) ValidateToken(tokenStr string) (userID uuid.UUID, role st
 	})
 
 	if err != nil || !token.Valid {
-		return uuid.Nil, "", fmt.Errorf("invalid token: %w", err)
+		return uuid.Nil, "", "", fmt.Errorf("invalid token: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return uuid.Nil, "", fmt.Errorf("invalid token claims")
+		return uuid.Nil, "", "", fmt.Errorf("invalid token claims")
 	}
 
 	sub, ok := claims["sub"].(string)
 	if !ok || sub == "" {
-		return uuid.Nil, "", fmt.Errorf("missing sub claim")
+		return uuid.Nil, "", "", fmt.Errorf("missing sub claim")
 	}
 
 	userID, err = uuid.Parse(sub)
 	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("invalid user ID in token: %w", err)
+		return uuid.Nil, "", "", fmt.Errorf("invalid user ID in token: %w", err)
 	}
 
 	if r, ok := claims["role"].(string); ok {
 		role = r
 	}
+	if u, ok := claims["username"].(string); ok {
+		username = u
+	}
 
-	return userID, role, nil
+	return userID, role, username, nil
 }
 
-// Authorizer resolves a user's role for a document's workspace.
-// Satisfied structurally by *service.DocumentService.
-// Returns the workspace role ("owner"/"editor"/"viewer") or an error
-// when the document does not exist or the user is not a member.
+// Authorizer resolves a user's role for a document's workspace and their
+// display name. Satisfied structurally by *service.DocumentService.
+// AuthorizeDocumentAccess returns the workspace role ("owner"/"editor"/"viewer")
+// or an error when the document does not exist or the user is not a member.
+// ResolveFirstName returns the user's first name (from their profile) and is
+// used to label collaborators when the JWT has no username claim.
 type Authorizer interface {
 	AuthorizeDocumentAccess(ctx context.Context, userID, docID uuid.UUID) (string, error)
+	ResolveFirstName(ctx context.Context, userID uuid.UUID) string
 }
 
 // UpgradeMiddleware checks for WebSocket upgrade requests
@@ -85,7 +92,7 @@ func HandleWebSocket(hub *Hub, validator *JWTValidator, authz Authorizer) fiber.
 		}
 
 		// Validate JWT token
-		userID, role, err := validator.ValidateToken(tokenStr)
+		userID, role, username, err := validator.ValidateToken(tokenStr)
 		if err != nil {
 			log.Printf("[WS] Connection rejected: invalid token: %v", err)
 			c.Close()
@@ -115,12 +122,23 @@ func HandleWebSocket(hub *Hub, validator *JWTValidator, authz Authorizer) fiber.
 
 		clientID := uuid.New().String()
 
+		// Label the collaborator: prefer the JWT username; if the token lacks
+		// one, fall back to the user's first name from their profile; finally
+		// a synthetic label if neither is available.
+		name := username
+		if name == "" && authz != nil {
+			name = authz.ResolveFirstName(context.Background(), userID)
+		}
+		if name == "" {
+			name = "User-" + clientID[:8]
+		}
+
 		client := &Client{
 			ID:     clientID,
 			UserID: userID.String(),
 			Role:   role,
 			WsRole: wsRole,
-			Name:   "User-" + clientID[:8],
+			Name:   name,
 			Conn:   c.Conn,
 			Room:   documentID,
 		}

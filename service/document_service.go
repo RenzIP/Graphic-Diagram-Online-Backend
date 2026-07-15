@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,6 +64,27 @@ func (s *DocumentService) AuthorizeDocumentAccess(ctx context.Context, userID, d
 		return "", appErr
 	}
 	return role, nil
+}
+
+// ResolveFirstName returns the user's first name (first word of their display
+// name), used by the WebSocket layer to label collaborators when the JWT lacks
+// a username claim. Returns "" if the user or name can't be resolved.
+func (s *DocumentService) ResolveFirstName(ctx context.Context, userID uuid.UUID) string {
+	user, appErr := s.wsSvc.userRepo.FindByID(ctx, userID)
+	if appErr != nil || user == nil {
+		return ""
+	}
+	var full string
+	if user.Name != nil && *user.Name != "" {
+		full = *user.Name
+	} else if user.FullName != nil {
+		full = *user.FullName
+	}
+	fields := strings.Fields(strings.TrimSpace(full))
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
 }
 
 // GetByID returns a single document with full content. Requires workspace membership.
