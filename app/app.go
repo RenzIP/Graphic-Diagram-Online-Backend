@@ -102,6 +102,7 @@ func New() (*Instance, error) {
 		Admin:     handler.NewAdminHandler(database),
 		Hub:       hub,
 		Validator: validator,
+		WSAuthz:   docSvc,
 	}
 
 	// Fiber app

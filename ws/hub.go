@@ -12,7 +12,8 @@ import (
 type Client struct {
 	ID     string
 	UserID string // Authenticated user ID from JWT
-	Role   string // User role from JWT
+	Role   string // Global user role from JWT (e.g. "user"/"admin")
+	WsRole string // Workspace role for this document ("owner"/"editor"/"viewer")
 	Name   string
 	Conn   *websocket.Conn
 	Room   string

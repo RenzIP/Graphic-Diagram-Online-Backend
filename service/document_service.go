@@ -48,6 +48,23 @@ func (s *DocumentService) ListByProject(ctx context.Context, userID, projectID u
 	return &dto.DocumentListResp{Data: items, Meta: meta}, nil
 }
 
+// AuthorizeDocumentAccess checks that the user is a member of the document's
+// workspace and returns their role. Used by the WebSocket handler to gate
+// realtime access, mirroring the membership checks on the REST paths.
+// Returns a plain error (not *pkg.AppError) so callers assigning to an
+// error interface don't hit the typed-nil trap on the success path.
+func (s *DocumentService) AuthorizeDocumentAccess(ctx context.Context, userID, docID uuid.UUID) (string, error) {
+	doc, appErr := s.docRepo.FindByID(ctx, docID)
+	if appErr != nil {
+		return "", appErr
+	}
+	role, appErr := s.wsSvc.RequireMembership(ctx, doc.WorkspaceID, userID)
+	if appErr != nil {
+		return "", appErr
+	}
+	return role, nil
+}
+
 // GetByID returns a single document with full content. Requires workspace membership.
 func (s *DocumentService) GetByID(ctx context.Context, userID, docID uuid.UUID) (*dto.DocumentResp, *pkg.AppError) {
 	doc, appErr := s.docRepo.FindByID(ctx, docID)

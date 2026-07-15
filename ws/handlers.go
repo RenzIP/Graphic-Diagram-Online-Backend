@@ -53,6 +53,14 @@ func (v *JWTValidator) ValidateToken(tokenStr string) (userID uuid.UUID, role st
 	return userID, role, nil
 }
 
+// Authorizer resolves a user's role for a document's workspace.
+// Satisfied structurally by *service.DocumentService.
+// Returns the workspace role ("owner"/"editor"/"viewer") or an error
+// when the document does not exist or the user is not a member.
+type Authorizer interface {
+	AuthorizeDocumentAccess(ctx context.Context, userID, docID uuid.UUID) (string, error)
+}
+
 // UpgradeMiddleware checks for WebSocket upgrade requests
 func UpgradeMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -63,8 +71,10 @@ func UpgradeMiddleware() fiber.Handler {
 	}
 }
 
-// HandleWebSocket returns a Fiber handler for WebSocket connections
-func HandleWebSocket(hub *Hub, validator *JWTValidator) fiber.Handler {
+// HandleWebSocket returns a Fiber handler for WebSocket connections.
+// authz may be nil (membership checks are then skipped), but in production
+// it should be a *service.DocumentService so only workspace members can join.
+func HandleWebSocket(hub *Hub, validator *JWTValidator, authz Authorizer) fiber.Handler {
 	return gws.New(func(c *gws.Conn) {
 		// Extract token from query parameter
 		tokenStr := c.Query("token")
@@ -83,12 +93,33 @@ func HandleWebSocket(hub *Hub, validator *JWTValidator) fiber.Handler {
 		}
 
 		documentID := c.Params("documentId")
+
+		// Authorize: the user must be a member of the document's workspace.
+		// wsRole ("owner"/"editor"/"viewer") gates mutations below.
+		wsRole := "editor"
+		if authz != nil {
+			docUUID, err := uuid.Parse(documentID)
+			if err != nil {
+				log.Printf("[WS] Connection rejected: invalid document id %q", documentID)
+				c.Close()
+				return
+			}
+			r, authErr := authz.AuthorizeDocumentAccess(context.Background(), userID, docUUID)
+			if authErr != nil {
+				log.Printf("[WS] Connection rejected: user %s not authorized for document %s: %v", userID, documentID, authErr)
+				c.Close()
+				return
+			}
+			wsRole = r
+		}
+
 		clientID := uuid.New().String()
 
 		client := &Client{
 			ID:     clientID,
 			UserID: userID.String(),
 			Role:   role,
+			WsRole: wsRole,
 			Name:   "User-" + clientID[:8],
 			Conn:   c.Conn,
 			Room:   documentID,
@@ -202,6 +233,13 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 		return
 	}
 
+	// Authorization: viewers may observe (cursor + join only) but not mutate,
+	// mirroring the "viewers cannot edit" rule enforced on the REST paths.
+	if client.WsRole == "viewer" && isMutation(msg.Type) {
+		sendError(client, "viewers cannot edit this document")
+		return
+	}
+
 	switch msg.Type {
 	case TypeLockNode:
 		if msg.NodeID == "" {
@@ -288,8 +326,19 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 			return
 		}
 		broadcastJSON(room, client.ID, Message{
-			Type: "edge_added",
+			Type: TypeEdgeAdded,
 			Edge: msg.Edge,
+		})
+
+	case TypeUpdateEdge:
+		if msg.EdgeID == "" || msg.Changes == nil {
+			sendError(client, "edge_id and changes are required for update_edge")
+			return
+		}
+		broadcastJSON(room, client.ID, Message{
+			Type:    TypeEdgeUpdated,
+			EdgeID:  msg.EdgeID,
+			Changes: msg.Changes,
 		})
 
 	case TypeDeleteEdge:
@@ -298,8 +347,18 @@ func handleMessage(client *Client, room *Room, hub *Hub, msg Message) {
 			return
 		}
 		broadcastJSON(room, client.ID, Message{
-			Type:   "edge_deleted",
+			Type:   TypeEdgeDeleted,
 			EdgeID: msg.EdgeID,
+		})
+
+	case TypeReplaceDocument:
+		if msg.State == nil {
+			sendError(client, "state is required for replace_document")
+			return
+		}
+		broadcastJSON(room, client.ID, Message{
+			Type:  TypeReplaceDocument,
+			State: msg.State,
 		})
 
 	case TypeCursorMove:

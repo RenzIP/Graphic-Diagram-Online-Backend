@@ -6,12 +6,14 @@ const (
 	TypeJoinRoom   = "join_room"
 	TypeLockNode   = "lock_node"
 	TypeUnlockNode = "unlock_node"
-	TypeUpdateNode = "update_node"
-	TypeAddNode    = "add_node"
-	TypeDeleteNode = "delete_node"
-	TypeAddEdge    = "add_edge"
-	TypeDeleteEdge = "delete_edge"
-	TypeCursorMove = "cursor_move"
+	TypeUpdateNode      = "update_node"
+	TypeAddNode         = "add_node"
+	TypeDeleteNode      = "delete_node"
+	TypeAddEdge         = "add_edge"
+	TypeUpdateEdge      = "update_edge"
+	TypeDeleteEdge      = "delete_edge"
+	TypeReplaceDocument = "replace_document"
+	TypeCursorMove      = "cursor_move"
 
 	// Server → Client
 	TypeRoomState    = "room_state"
@@ -22,9 +24,28 @@ const (
 	TypeNodeUpdated  = "node_updated"
 	TypeNodeAdded    = "node_added"
 	TypeNodeDeleted  = "node_deleted"
+	TypeEdgeAdded    = "edge_added"
+	TypeEdgeUpdated  = "edge_updated"
+	TypeEdgeDeleted  = "edge_deleted"
 	TypeCursorUpdate = "cursor_update"
 	TypeError        = "error"
 )
+
+// isMutation reports whether a client→server message type modifies document
+// state (as opposed to observing it). Viewers are allowed everything else
+// (join_room, cursor_move) but blocked from these, mirroring the REST rule
+// that viewers cannot edit.
+func isMutation(msgType string) bool {
+	switch msgType {
+	case TypeLockNode, TypeUnlockNode, TypeUpdateNode,
+		TypeAddNode, TypeDeleteNode,
+		TypeAddEdge, TypeUpdateEdge, TypeDeleteEdge,
+		TypeReplaceDocument:
+		return true
+	default:
+		return false
+	}
+}
 
 // Message is a generic WebSocket message
 type Message struct {
@@ -45,6 +66,9 @@ type Message struct {
 	// cursor
 	X float64 `json:"x,omitempty"`
 	Y float64 `json:"y,omitempty"`
+
+	// whole-document replace (import / version restore)
+	State map[string]interface{} `json:"state,omitempty"`
 
 	// server → client context
 	UserID string                 `json:"user_id,omitempty"`
