@@ -24,10 +24,16 @@ func Auth(jwtSecret string) fiber.Handler {
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		// Terima dua format: "Bearer <token>" (standar frontend) maupun
+		// token mentah <token> (Swagger UI apiKey / curl manual).
+		var tokenStr string
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			tokenStr = parts[1]
+		} else if len(parts) == 1 && parts[0] != "" {
+			tokenStr = parts[0]
+		} else {
 			return pkg.WriteError(c, pkg.ErrUnauthorized.WithMessage("invalid Authorization header format"))
 		}
-		tokenStr := parts[1]
 
 		// Parse and validate the JWT — HS256 only
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {

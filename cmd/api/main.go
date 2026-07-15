@@ -3,9 +3,9 @@
 // @description Backend API for Graphic Diagram Online (GraDiOl)
 // @host asia-southeast1-renzip-478811.cloudfunctions.net
 // @BasePath /gradiol-api/api
-// @securityDefinitions.apikey BearerAuth
+// @securityDefinitions.http BearerAuth
 // @in header
-// @name Authorization
+// @scheme bearer
 
 package main
 

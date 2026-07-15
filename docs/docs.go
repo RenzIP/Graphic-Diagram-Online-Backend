@@ -14,6 +14,14 @@ const docTemplate = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Bearer token. Cukup tempel token mentah (tanpa prefix 'Bearer '). Token didapat dari /login atau /register."
+        }
+    },
     "paths": {
         "/admin/documents": {
             "get": {
@@ -2547,13 +2555,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        }
-    },
-    "securityDefinitions": {
-        "BearerAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
         }
     }
 }`

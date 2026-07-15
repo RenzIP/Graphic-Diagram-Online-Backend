@@ -1,4 +1,10 @@
 basePath: /gradiol-api/api
+securityDefinitions:
+  BearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: JWT Bearer token. Cukup tempel token mentah (tanpa prefix 'Bearer '). Token didapat dari /login atau /register.
 definitions:
   dto.AddMemberReq:
     properties:
@@ -1659,9 +1665,4 @@ paths:
       summary: Get list of projects in a workspace
       tags:
       - projects
-securityDefinitions:
-  BearerAuth:
-    in: header
-    name: Authorization
-    type: apiKey
 swagger: "2.0"

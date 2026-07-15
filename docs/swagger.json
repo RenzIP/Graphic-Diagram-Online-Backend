@@ -8,6 +8,14 @@
     },
     "host": "asia-southeast1-renzip-478811.cloudfunctions.net",
     "basePath": "/gradiol-api/api",
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Bearer token. Cukup tempel token mentah (tanpa prefix 'Bearer '). Contoh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.... Token didapat dari /login atau /register."
+        }
+    },
     "paths": {
         "/admin/documents": {
             "get": {
@@ -2541,13 +2549,6 @@
                     "type": "string"
                 }
             }
-        }
-    },
-    "securityDefinitions": {
-        "BearerAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
         }
     }
 }
