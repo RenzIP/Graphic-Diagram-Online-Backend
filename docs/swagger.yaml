@@ -1,5 +1,20 @@
 basePath: /gradiol-api/api
 definitions:
+  dto.AddMemberReq:
+    properties:
+      identifier:
+        maxLength: 255
+        minLength: 1
+        type: string
+      role:
+        enum:
+        - editor
+        - viewer
+        type: string
+    required:
+    - identifier
+    - role
+    type: object
   dto.AuthCallbackResp:
     properties:
       token:
@@ -9,15 +24,24 @@ definitions:
     type: object
   dto.AuthUserResp:
     properties:
+      avatar:
+        type: string
       avatar_url:
         type: string
       email:
         type: string
       full_name:
+        description: Keep existing ones for backward compatibility
         type: string
       id:
         type: string
+      name:
+        type: string
+      provider:
+        type: string
       role:
+        type: string
+      status:
         type: string
       username:
         type: string
@@ -145,12 +169,39 @@ definitions:
   dto.LoginReq:
     properties:
       identifier:
+        description: email or username
         type: string
       password:
         type: string
     required:
     - identifier
     - password
+    type: object
+  dto.MemberListResp:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.MemberResp'
+        type: array
+    type: object
+  dto.MemberResp:
+    properties:
+      avatar:
+        type: string
+      email:
+        type: string
+      is_owner:
+        type: boolean
+      joined_at:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
     type: object
   dto.PaginationMeta:
     properties:
@@ -165,6 +216,10 @@ definitions:
     type: object
   dto.RegisterReq:
     properties:
+      email:
+        type: string
+      name:
+        type: string
       password:
         maxLength: 72
         minLength: 6
@@ -174,6 +229,8 @@ definitions:
         minLength: 3
         type: string
     required:
+    - email
+    - name
     - password
     - username
     type: object
@@ -189,6 +246,17 @@ definitions:
         type: string
       view:
         type: object
+    type: object
+  dto.UpdateMemberRoleReq:
+    properties:
+      role:
+        enum:
+        - owner
+        - editor
+        - viewer
+        type: string
+    required:
+    - role
     type: object
   dto.UpdateProjectReq:
     properties:
@@ -279,17 +347,35 @@ definitions:
     type: object
   model.UserProfile:
     properties:
+      avatar:
+        type: string
       avatar_url:
         type: string
       created_at:
         type: string
       email:
         type: string
+      email_verified_at:
+        type: string
       full_name:
+        description: Keep existing fields for backward compatibility if needed in
+          some parts
         type: string
       id:
         type: string
+      last_login:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+      provider_id:
+        type: string
       role:
+        type: string
+      status:
+        type: string
+      updated_at:
         type: string
       username:
         type: string
@@ -1359,6 +1445,174 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a workspace
+      tags:
+      - workspaces
+  /workspaces/{id}/members:
+    get:
+      description: Lists all members of a workspace (must be a member)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MemberListResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: List workspace members
+      tags:
+      - workspaces
+    post:
+      consumes:
+      - application/json
+      description: Invites a user by username or email (must be owner)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddMemberReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.MemberResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Add a workspace member
+      tags:
+      - workspaces
+  /workspaces/{id}/members/{userId}:
+    delete:
+      description: Removes a member (owner removes anyone; members can leave)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Remove a workspace member
+      tags:
+      - workspaces
+    put:
+      consumes:
+      - application/json
+      description: Changes a member's role (must be owner)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Role
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateMemberRoleReq'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg.AppError'
+      security:
+      - BearerAuth: []
+      summary: Update a member's role
       tags:
       - workspaces
   /workspaces/{id}/projects:
