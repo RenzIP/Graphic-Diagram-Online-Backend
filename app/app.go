@@ -88,7 +88,7 @@ func New() (*Instance, error) {
 
 	// --- Service layer ---
 	authSvc := service.NewAuthService(userRepo)
-	wsSvc := service.NewWorkspaceService(wsRepo)
+	wsSvc := service.NewWorkspaceService(wsRepo, userRepo)
 	projSvc := service.NewProjectService(projRepo, wsSvc)
 	docSvc := service.NewDocumentService(docRepo, projRepo, wsSvc)
 

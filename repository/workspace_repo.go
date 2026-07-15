@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -114,6 +115,57 @@ func (r *WorkspaceRepo) CountMembers(ctx context.Context, workspaceID uuid.UUID)
 		return 0, pkg.ErrInternal.WithMessage("failed to count members").WithDetails(err.Error())
 	}
 	return int(count), nil
+}
+
+// MemberRow is a joined row of workspace_members + user_profiles used for member listings.
+type MemberRow struct {
+	UserID   uuid.UUID
+	Name     *string
+	Username *string
+	Email    *string
+	Avatar   *string
+	Role     string
+	JoinedAt time.Time
+}
+
+// ListMembers returns all members of a workspace joined with their user profile,
+// owner first then most recently joined.
+func (r *WorkspaceRepo) ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]MemberRow, *pkg.AppError) {
+	var rows []MemberRow
+	err := r.db.WithContext(ctx).
+		Table("workspace_members wm").
+		Select("wm.user_id, u.name, u.username, u.email, u.avatar, wm.role, wm.joined_at").
+		Joins("join user_profiles u on u.id = wm.user_id").
+		Where("wm.workspace_id = ?", workspaceID).
+		Order("case when wm.role = 'owner' then 0 else 1 end, wm.joined_at asc").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, pkg.ErrInternal.WithMessage("failed to list members").WithDetails(err.Error())
+	}
+	return rows, nil
+}
+
+// UpdateMemberRole changes a member's role within a workspace.
+func (r *WorkspaceRepo) UpdateMemberRole(ctx context.Context, workspaceID, userID uuid.UUID, role string) *pkg.AppError {
+	err := r.db.WithContext(ctx).
+		Model(&model.WorkspaceMember{}).
+		Where("workspace_id = ? and user_id = ?", workspaceID, userID).
+		Update("role", role).Error
+	if err != nil {
+		return pkg.ErrInternal.WithMessage("failed to update member role").WithDetails(err.Error())
+	}
+	return nil
+}
+
+// RemoveMember deletes a membership row.
+func (r *WorkspaceRepo) RemoveMember(ctx context.Context, workspaceID, userID uuid.UUID) *pkg.AppError {
+	err := r.db.WithContext(ctx).
+		Where("workspace_id = ? and user_id = ?", workspaceID, userID).
+		Delete(&model.WorkspaceMember{}).Error
+	if err != nil {
+		return pkg.ErrInternal.WithMessage("failed to remove member").WithDetails(err.Error())
+	}
+	return nil
 }
 
 func (r *WorkspaceRepo) InsertWithOwner(ctx context.Context, ws *model.Workspace, member *model.WorkspaceMember) *pkg.AppError {

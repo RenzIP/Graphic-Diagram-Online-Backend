@@ -72,6 +72,11 @@ func Setup(app *fiber.App, cfg *config.Config, h Handlers) {
 	protected.Put("/workspaces/:id", h.Workspace.Update)
 	protected.Delete("/workspaces/:id", h.Workspace.Delete)
 
+	protected.Get("/workspaces/:id/members", h.Workspace.ListMembers)
+	protected.Post("/workspaces/:id/members", h.Workspace.AddMember)
+	protected.Put("/workspaces/:id/members/:userId", h.Workspace.UpdateMemberRole)
+	protected.Delete("/workspaces/:id/members/:userId", h.Workspace.RemoveMember)
+
 	protected.Get("/workspaces/:id/projects", h.Project.ListByWorkspace)
 	protected.Post("/projects", h.Project.Create)
 	protected.Put("/projects/:id", h.Project.Update)

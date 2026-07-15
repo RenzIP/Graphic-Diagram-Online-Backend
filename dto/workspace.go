@@ -43,3 +43,32 @@ type WorkspaceListResp struct {
 	Data []WorkspaceListItem `json:"data"`
 	Meta PaginationMeta      `json:"meta"`
 }
+
+// AddMemberReq is the body for POST /api/workspaces/:id/members.
+// Identifier accepts either the invitee's username or email.
+type AddMemberReq struct {
+	Identifier string `json:"identifier" validate:"required,min=1,max=255"`
+	Role       string `json:"role"       validate:"required,oneof=editor viewer"`
+}
+
+// UpdateMemberRoleReq is the body for PUT /api/workspaces/:id/members/:userId.
+type UpdateMemberRoleReq struct {
+	Role string `json:"role" validate:"required,oneof=owner editor viewer"`
+}
+
+// MemberResp describes a single workspace member with user details.
+type MemberResp struct {
+	UserID   string    `json:"user_id"`
+	Name     *string   `json:"name"`
+	Username *string   `json:"username"`
+	Email    *string   `json:"email"`
+	Avatar   *string   `json:"avatar"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
+	IsOwner  bool      `json:"is_owner"`
+}
+
+// MemberListResp is the response for GET /api/workspaces/:id/members.
+type MemberListResp struct {
+	Data []MemberResp `json:"data"`
+}
