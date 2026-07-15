@@ -107,7 +107,14 @@ create table if not exists user_profiles (
 	full_name text,
 	avatar_url text,
 	role text not null default 'user' check (role in ('admin', 'user')),
-	created_at timestamptz not null default now()
+	provider text default 'local',
+	provider_id text,
+	status text default 'active',
+	email_verified_at timestamptz,
+	remember_token text,
+	last_login timestamptz,
+	created_at timestamptz not null default now(),
+	updated_at timestamptz default now()
 );
 
 alter table user_profiles add column if not exists username text;
@@ -184,6 +191,18 @@ create index if not exists idx_documents_workspace_id on documents(workspace_id)
 create index if not exists idx_documents_created_by on documents(created_by);
 create index if not exists idx_documents_updated_at on documents(updated_at desc);
 create index if not exists idx_documents_diagram_type on documents(diagram_type);
+
+create table if not exists document_versions (
+	id uuid primary key,
+	document_id uuid not null references documents(id) on delete cascade,
+	version integer not null,
+	content jsonb not null,
+	view jsonb not null,
+	created_by uuid references user_profiles(id) on delete set null,
+	created_at timestamptz not null default now()
+);
+
+create index if not exists idx_document_versions_document_id on document_versions(document_id);
 `
 
 const dropSQL = `
