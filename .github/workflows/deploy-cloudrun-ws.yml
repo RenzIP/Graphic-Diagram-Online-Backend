@@ -77,11 +77,17 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build & push image (Cloud Build)
+      - name: Build & push image (Docker on runner)
         run: |
+          # Build and push directly from the runner instead of Cloud Build.
+          # Cloud Build's log streaming requires Viewer/Owner on the project and
+          # fails on scoped CI service accounts; the runner already has Docker,
+          # so this sidesteps that whole class of permission errors.
           IMAGE="gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
-          gcloud builds submit --tag "$IMAGE" --suppress-logs .
+          gcloud auth configure-docker gcr.io --quiet
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
 
       - name: Deploy to Cloud Run
         run: |
