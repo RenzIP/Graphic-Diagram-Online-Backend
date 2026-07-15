@@ -64,7 +64,9 @@ jobs:
           cache: true
 
       - name: Verify build
-        run: go build ./cmd/ws
+        # Discard the binary: `go build ./cmd/ws` would write an artifact named
+        # "ws" into the repo root, colliding with the existing ws/ package dir.
+        run: go build -o /dev/null ./cmd/ws
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
